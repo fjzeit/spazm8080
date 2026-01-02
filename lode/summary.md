@@ -4,7 +4,7 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Ready for Phase 3 - Core assembler development
+**Phase**: Bootstrap Stage 0 - Hand-assembling minimal assembler
 
 ### Completed
 - **Phase 1**: Lode and design documentation ✓
@@ -12,11 +12,17 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
   - `Heh8080.Mcp` project with 9 tools (SendInput, ReadScreen, WaitForText, etc.)
   - Tested and verified working with LOLOS
 - **Workflow**: cpmtools-based source file sync established ✓
+- **LOLOS boot verified**: work.dsk boots, MCP console interaction works ✓
 
 ### Next Steps
-- Begin writing assembler core in 8080 assembly
-- Start with minimal viable assembler (ORG, EQU, DB, END)
-- Bootstrap iteratively using MCP
+1. Hand-assemble Stage 0 (~200-300 bytes) supporting ORG, DB, END only
+2. Inject via PokeMemory, save as SPAZM0.COM
+3. Write Stage 1 source using ORG/DB/END syntax
+4. Assemble Stage 1 with SPAZM0
+5. Iterate through stages until self-hosting
+
+### Resume Prompt
+"Continue spazm8080 development. Read lode/summary.md for current status."
 
 ## Goals
 

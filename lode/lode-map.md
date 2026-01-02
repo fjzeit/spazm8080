@@ -7,6 +7,7 @@
 
 ## Assembler Design
 - [assembler/architecture.md](assembler/architecture.md) - Overall architecture and data flow
+- [assembler/bootstrap.md](assembler/bootstrap.md) - Stage 0-3 bootstrap from hand-assembled hex
 - [assembler/workflow.md](assembler/workflow.md) - Development workflow with cpmtools
 
 ## Plans
