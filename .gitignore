@@ -1,0 +1,16 @@
+# Lode session scraps
+lode/tmp/
+
+# Build outputs
+*.hex
+*.bin
+*.com
+*.lst
+
+# Editor backups
+*~
+*.bak
+
+# IDE/Editor
+.vscode/
+.idea/
