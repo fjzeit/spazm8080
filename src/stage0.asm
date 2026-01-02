@@ -193,7 +193,8 @@ GC1:    LHLD    IPTR            ; 2A xx xx
         ORA     A               ; B7        Check for 0 (LOLOS EOF) + clear CY
         JZ      GC2             ; CA xx xx  EOF if null
         CPI     1AH             ; FE 1A     CP/M EOF marker
-        JZ      GC2             ; CA xx xx  EOF if 0x1A
+        JZ      GC2             ; CA 00 02  EOF if 0x1A
+        ORA     A               ; B7        Clear CY set by CPI
         RET                     ; C9        Return with char, CY=0
 
 GC2:    STC                     ; 37

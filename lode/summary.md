@@ -4,7 +4,13 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Bootstrap Stage 1 - Writing assembler with labels
+**Phase**: Bootstrap Stage 1 - Ready to proceed
+
+### Stage 0 Complete ✓
+
+SPAZM0.COM (430 bytes) - hex-to-COM converter working correctly.
+
+**Bug fixed (2026-01-03)**: `CPI 1AH` in GETCHR was setting carry flag for chars < 0x1A (including LF, CR, TAB), causing MAIN's `JC DONE` to trigger premature EOF. Fixed by adding `ORA A` before RET to clear carry. See [assembler/stage0-newline-bug.md](assembler/stage0-newline-bug.md).
 
 ### Completed
 - **Phase 1**: Lode and design documentation ✓
@@ -13,19 +19,22 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
   - Tested and verified working with LOLOS
 - **Workflow**: cpmtools-based source file sync established ✓
 - **LOLOS boot verified**: work.dsk boots, MCP console interaction works ✓
-- **Stage 0 (SPAZM0.COM)**: 429-byte hex-to-COM converter ✓
+- **Stage 0 (SPAZM0.COM)**: 430-byte hex-to-COM converter ✓
   - Hand-assembled from `src/stage0.hex`
   - Converts `.HEX` files (hex bytes + `;` comments) to `.COM` binaries
-  - Tested with `MIN.HEX` → `MIN.COM` (prints "OK")
+  - Multi-line support verified working
+- **Stage 1 source**: Written in `src/stage1.hex` (~870 lines)
+  - Two-pass assembler with labels, ORG, END, EQU
+  - Ready to assemble with SPAZM0
 
 ### Next Steps
-1. Design Stage 1 features: EQU, DB, DW, DS, labels, basic instructions
-2. Write Stage 1 source in `.HEX` format for SPAZM0
-3. Assemble Stage 1 with SPAZM0
+1. Assemble Stage 1 with SPAZM0: `SPAZM0 STAGE1`
+2. Test Stage 1 on simple test files
+3. Add DB, DW, DS directives to Stage 1
 4. Test and iterate through stages until self-hosting
 
 ### Resume Prompt
-"Continue spazm8080 development. Read lode/summary.md for current status."
+"Continue spazm8080 development. Stage 0 is complete. Next: assemble Stage 1 with SPAZM0 and test it."
 
 ## Goals
 
@@ -80,4 +89,4 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | `lode/practices.md` | Assembly coding patterns |
 | `src/stage0.asm` | Stage 0 documented source |
 | `src/stage0.hex` | Stage 0 hand-assembled bytes |
-| `src/stage0.com` | Stage 0 binary (429 bytes) |
+| `src/stage0.com` | Stage 0 binary (430 bytes) |
