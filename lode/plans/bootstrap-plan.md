@@ -35,7 +35,7 @@ Add an MCP server to the heh8080 emulator enabling Claude to directly interact w
 
 ## Implementation Order
 1. **Phase 1**: Set up spazm8080 lode and design (this repo) ✓ COMPLETE
-2. **Phase 2**: Add MCP Server to heh8080 (heh8080 repo)
+2. **Phase 2**: Add MCP Server to heh8080 (heh8080 repo) ✓ COMPLETE
 3. **Phase 3**: Develop spazm8080 using MCP
 
 ---
@@ -75,14 +75,14 @@ src/
 
 ---
 
-## Phase 2: Add MCP Server to heh8080
+## Phase 2: Add MCP Server to heh8080 ✓ COMPLETE
 
-### 2.1 Add NuGet packages to Heh8080.Desktop
+### 2.1 Add NuGet packages to Heh8080.Desktop ✓
 ```xml
 <PackageReference Include="ModelContextProtocol" Version="*-*" />
 ```
 
-### 2.2 Create `Heh8080.Mcp` project
+### 2.2 Create `Heh8080.Mcp` project ✓
 New project for MCP tools, references:
 - Heh8080.Terminal (for screen access)
 - Heh8080.Devices (for disk access)
@@ -92,7 +92,7 @@ New project for MCP tools, references:
 - `src/Heh8080.Mcp/Heh8080.Mcp.csproj`
 - `src/Heh8080.Mcp/CpmTools.cs` - MCP tool implementations
 
-### 2.3 Define MCP Tools
+### 2.3 Define MCP Tools ✓
 
 ```csharp
 [McpServerToolType]
@@ -109,7 +109,7 @@ public class CpmTools
 }
 ```
 
-### 2.4 Integrate with Desktop startup
+### 2.4 Integrate with Desktop startup ✓
 Add `--mcp` flag to start MCP server on stdio transport.
 
 ---

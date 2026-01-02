@@ -7,6 +7,7 @@
 
 ## Assembler Design
 - [assembler/architecture.md](assembler/architecture.md) - Overall architecture and data flow
+- [assembler/workflow.md](assembler/workflow.md) - Development workflow with cpmtools
 
 ## Plans
 - [plans/bootstrap-plan.md](plans/bootstrap-plan.md) - MCP integration and bootstrap strategy
