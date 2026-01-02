@@ -2,7 +2,7 @@
 # Sync source files from repo to CP/M disk image
 # Usage: ./scripts/sync-to-disk.sh [disk_image]
 
-DISK="${1:-../lolos/drivea.dsk}"
+DISK="${1:-$(dirname "$0")/../work.dsk}"
 FORMAT="ibm-3740"
 SRC_DIR="$(dirname "$0")/../src"
 

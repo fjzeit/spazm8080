@@ -4,7 +4,19 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Design and lode initialization
+**Phase**: Ready for Phase 3 - Core assembler development
+
+### Completed
+- **Phase 1**: Lode and design documentation ✓
+- **Phase 2**: MCP server added to heh8080 ✓
+  - `Heh8080.Mcp` project with 9 tools (SendInput, ReadScreen, WaitForText, etc.)
+  - Tested and verified working with LOLOS
+- **Workflow**: cpmtools-based source file sync established ✓
+
+### Next Steps
+- Begin writing assembler core in 8080 assembly
+- Start with minimal viable assembler (ORG, EQU, DB, END)
+- Bootstrap iteratively using MCP
 
 ## Goals
 
@@ -34,3 +46,26 @@ Development uses heh8080 emulator with MCP server integration, enabling Claude t
 
 - [lolos](../lolos) - Target CP/M system and test source
 - [heh8080](../heh8080) - Emulator with MCP integration
+
+## Quick Reference
+
+### MCP Server
+Configured in `.claude/settings.json` - available as `cpm` MCP server with tools:
+- `SendInput`, `ReadScreen`, `WaitForText` - console interaction
+- `PeekMemory`, `PokeMemory` - memory access
+- `Status`, `Reset`, `MountDisk`, `DiskInfo` - machine control
+
+### Sync Workflow
+```bash
+./scripts/sync-to-disk.sh    # Before: src/*.asm → disk
+./scripts/sync-from-disk.sh  # After: disk → src/*.asm
+```
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `lode/assembler/architecture.md` | Two-pass design, data structures, module APIs |
+| `lode/assembler/workflow.md` | cpmtools sync workflow |
+| `lode/plans/bootstrap-plan.md` | Full implementation plan |
+| `lode/terminology.md` | 8080/Z80/CP/M vocabulary |
+| `lode/practices.md` | Assembly coding patterns |

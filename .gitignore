@@ -1,6 +1,9 @@
 # Lode session scraps
 lode/tmp/
 
+# Working disk image (restore from lolos if needed)
+work.dsk
+
 # Build outputs
 *.hex
 *.bin
@@ -14,3 +17,5 @@ lode/tmp/
 # IDE/Editor
 .vscode/
 .idea/
+
+.claude/

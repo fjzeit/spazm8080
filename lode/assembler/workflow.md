@@ -13,11 +13,11 @@ spazm8080/
 ├── scripts/
 │   ├── sync-to-disk.sh     # Host → CP/M
 │   └── sync-from-disk.sh   # CP/M → Host
+├── work.dsk                # Working disk (.gitignored)
 └── lode/
-
-../lolos/
-└── drivea.dsk              # Working disk (not tracked here)
 ```
+
+To restore work.dsk if corrupted: `cp ../lolos/drivea.dsk work.dsk`
 
 ## Workflow
 
@@ -25,7 +25,7 @@ spazm8080/
 
 ```bash
 # Inject latest sources into disk
-./scripts/sync-to-disk.sh ../lolos/drivea.dsk
+./scripts/sync-to-disk.sh
 ```
 
 ### During Session (via MCP)
@@ -40,7 +40,7 @@ SendInput("SPAZM TEST\r")   # Test
 
 ```bash
 # Extract any changes back to repo
-./scripts/sync-from-disk.sh ../lolos/drivea.dsk
+./scripts/sync-from-disk.sh
 
 # Review and commit
 git diff src/
