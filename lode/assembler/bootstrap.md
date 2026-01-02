@@ -35,58 +35,70 @@ spazm8080 bootstraps from zero - no external assembler. We hand-assemble stage 0
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Stage 0 Design
+## Stage 0 Design (COMPLETED)
 
-Minimal assembler supporting only:
-- `ORG addr` - Set location counter
-- `DB n,n,...` - Define bytes (hex or decimal)
-- `END` - Stop assembly, output binary
+Minimal hex-to-COM converter. Even simpler than originally planned - just raw hex bytes.
 
-No labels, no expressions, no instructions. Just a glorified hex loader that outputs a raw .COM file.
-
-### Input Format
+### Input Format (.HEX)
 
 ```
-ORG 0100H
-DB 21H,00H,01H    ; LXI H,0100H
-DB C3H,00H,00H    ; JMP 0000H
-END
+; Comment lines start with semicolon
+21 65 00        ; LXI H,0065H - bytes separated by whitespace
+36 48 23        ; MVI M,'H'; INX H
+C3 00 00        ; JMP 0000H
 ```
 
-### Stage 0 Algorithm
+### Features
+- Hex byte pairs separated by whitespace (space, tab, CR, LF)
+- `;` starts comment until end of line
+- Outputs raw binary `.COM` file
+- **LOLOS-aware**: Handles 0x00 padding as EOF (not just 0x1A)
+
+### Stage 0 Memory Map (429 bytes)
 
 ```
-1. Open input file (FCB at 005CH)
-2. Open output file (change extension to .COM)
-3. Set location counter = 0
-4. For each line:
-   a. Skip whitespace
-   b. If "ORG": parse hex number, set LC
-   c. If "DB": parse comma-separated bytes, write to output
-   d. If "END": close files, exit
-   e. If ";": skip comment
-5. Flush and close output
+0100-011E: Startup (open input, copy FCB, set .COM extension)
+011F-0134: COPY loop, ZERO loop
+0135-015C: Delete old/Create new output file
+015D-019A: MAIN loop - read char, skip whitespace, parse hex pairs
+019A-01A7: SKIPCMT - skip until newline
+01A8-01BD: DONE - flush buffer, close files, exit
+01BE-0200: GETCHR - buffered file reader
+0201-0229: HEXVAL - convert ASCII hex to nibble
+022A-0265: OUTPUT - buffered file writer
+0266-0276: WRSEC - write 128-byte sector
+0277-028D: Error handlers (No file, Disk full, Syntax)
+028E-02A6: Error message strings
+02A7-02AC: Variables (IPTR, ICNT, OPTR, OCNT)
+02AD-032C: Input buffer (128 bytes)
+032D-03AC: Output buffer (128 bytes)
+03AD-03CC: Output FCB (32 bytes)
 ```
 
-### Size Estimate
-
-Stage 0 should be ~200-300 bytes:
-- File I/O setup: ~50 bytes
-- Line reader: ~40 bytes
-- ORG parser: ~30 bytes
-- DB parser: ~60 bytes
-- Hex output: ~40 bytes
-- Main loop: ~30 bytes
-
-## MCP Bootstrap Workflow
+### Key Symbols (v3 corrected addresses)
 
 ```
-1. Hand-assemble stage 0 to hex bytes (documented in src/stage0.hex)
-2. PokeMemory(0x0100, stage0_bytes)
-3. SendInput("SAVE nn SPAZM0.COM\r")  ; nn = pages needed
-4. Write stage 1 source (using ORG/DB/END only)
-5. SendInput("SPAZM0 STAGE1\r")
-6. Test STAGE1.COM
+COPY=011F  ZERO=0135  MAIN=015D  SKIPCMT=019A  DONE=01A8
+GETCHR=01BE  GC1=01E4  GC2=01FF  HEXVAL=0201  HV1=0222
+HV2=0225  HVERR=0228  OUTPUT=022A  FLUSH=024C  FL1=0254
+WRSEC=0266  NOFILE=0277  DSKFUL=027D  SYNERR=0283  ERROR=0286
+```
+
+### Lessons Learned
+
+1. **LOLOS EOF**: LOLOS pads files with 0x00, not 0x1A (CP/M standard). Must check both.
+2. **Address calculation**: Hand-assembly requires meticulous byte counting. Off-by-one errors cascade.
+3. **CP/M SAVE**: Failed on LOLOS. Used `cpmcp` from host instead.
+
+## MCP Bootstrap Workflow (Updated)
+
+```
+1. Hand-assemble stage 0 in src/stage0.hex
+2. Convert to binary: parse hex, write to src/stage0.com
+3. Copy to disk: cpmcp -f ibmpc-sssd work.dsk src/stage0.com 0:SPAZM0.COM
+4. Test: SPAZM0 MIN → should produce MIN.COM
+5. Write stage 1 source in .HEX format
+6. Assemble: SPAZM0 STAGE1
 7. Repeat for higher stages
 ```
 

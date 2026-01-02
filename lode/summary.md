@@ -4,7 +4,7 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Bootstrap Stage 0 - Hand-assembling minimal assembler
+**Phase**: Bootstrap Stage 1 - Writing assembler with labels
 
 ### Completed
 - **Phase 1**: Lode and design documentation ✓
@@ -13,13 +13,16 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
   - Tested and verified working with LOLOS
 - **Workflow**: cpmtools-based source file sync established ✓
 - **LOLOS boot verified**: work.dsk boots, MCP console interaction works ✓
+- **Stage 0 (SPAZM0.COM)**: 429-byte hex-to-COM converter ✓
+  - Hand-assembled from `src/stage0.hex`
+  - Converts `.HEX` files (hex bytes + `;` comments) to `.COM` binaries
+  - Tested with `MIN.HEX` → `MIN.COM` (prints "OK")
 
 ### Next Steps
-1. Hand-assemble Stage 0 (~200-300 bytes) supporting ORG, DB, END only
-2. Inject via PokeMemory, save as SPAZM0.COM
-3. Write Stage 1 source using ORG/DB/END syntax
-4. Assemble Stage 1 with SPAZM0
-5. Iterate through stages until self-hosting
+1. Design Stage 1 features: EQU, DB, DW, DS, labels, basic instructions
+2. Write Stage 1 source in `.HEX` format for SPAZM0
+3. Assemble Stage 1 with SPAZM0
+4. Test and iterate through stages until self-hosting
 
 ### Resume Prompt
 "Continue spazm8080 development. Read lode/summary.md for current status."
@@ -71,7 +74,10 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | File | Purpose |
 |------|---------|
 | `lode/assembler/architecture.md` | Two-pass design, data structures, module APIs |
+| `lode/assembler/bootstrap.md` | Stage 0-3 bootstrap strategy |
 | `lode/assembler/workflow.md` | cpmtools sync workflow |
-| `lode/plans/bootstrap-plan.md` | Full implementation plan |
 | `lode/terminology.md` | 8080/Z80/CP/M vocabulary |
 | `lode/practices.md` | Assembly coding patterns |
+| `src/stage0.asm` | Stage 0 documented source |
+| `src/stage0.hex` | Stage 0 hand-assembled bytes |
+| `src/stage0.com` | Stage 0 binary (429 bytes) |

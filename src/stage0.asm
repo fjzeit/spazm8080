@@ -190,10 +190,11 @@ GC1:    LHLD    IPTR            ; 2A xx xx
         DCR     A               ; 3D
         STA     ICNT            ; 32 xx xx
         POP     PSW             ; F1
+        ORA     A               ; B7        Check for 0 (LOLOS EOF) + clear CY
+        JZ      GC2             ; CA xx xx  EOF if null
         CPI     1AH             ; FE 1A     CP/M EOF marker
-        JZ      GC2             ; CA xx xx
-        ORA     A               ; B7        Clear CY
-        RET                     ; C9
+        JZ      GC2             ; CA xx xx  EOF if 0x1A
+        RET                     ; C9        Return with char, CY=0
 
 GC2:    STC                     ; 37
         RET                     ; C9
