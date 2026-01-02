@@ -59,11 +59,15 @@ Examples:
 C3 LOOP         ; JMP LOOP - 3 bytes: C3 <LOOP >LOOP
 21 BUF          ; LXI H,BUF - 3 bytes: 21 <BUF >BUF
 3E 'A'          ; MVI A,'A' - 2 bytes: 3E 41
+3E <ADDR        ; MVI A,low(ADDR) - 2 bytes: 3E lowbyte
+3E >ADDR        ; MVI A,high(ADDR) - 2 bytes: 3E highbyte
 ```
 
-When a symbol appears where a byte is expected:
-- Single token after opcode: emit low byte, then high byte (little-endian)
-- This handles 16-bit operands naturally
+Symbol reference rules:
+- Bare `LABEL` → emit low byte, then high byte (16-bit little-endian)
+- `<LABEL` or `<expr` → emit only low byte
+- `>LABEL` or `>expr` → emit only high byte
+- `'c'` → emit ASCII value of character
 
 ## Two-Pass Architecture
 
