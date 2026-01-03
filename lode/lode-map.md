@@ -7,8 +7,9 @@
 
 ## Assembler Design
 - [assembler/architecture.md](assembler/architecture.md) - Overall architecture and data flow
-- [assembler/bootstrap.md](assembler/bootstrap.md) - Stage 0-3 bootstrap from hand-assembled hex
+- [assembler/bootstrap.md](assembler/bootstrap.md) - **Cold boot pipeline (PROTECTED)** and stage progression
 - [assembler/stage1-design.md](assembler/stage1-design.md) - Stage 1 extended hex format with labels
+- [assembler/stage1-testing.md](assembler/stage1-testing.md) - Stage 1 test results and bug fixes
 - [assembler/workflow.md](assembler/workflow.md) - Development workflow with cpmtools
 - [assembler/stage0-newline-bug.md](assembler/stage0-newline-bug.md) - ~~RESOLVED~~ CPI carry flag bug and fix
 

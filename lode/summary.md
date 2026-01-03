@@ -4,51 +4,40 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Bootstrap Stage 1 - Complete ✓
+**Phase**: Bootstrap Stage 1 Complete - Ready for Stage 2
+
+### Cold Boot Pipeline (PROTECTED)
+
+These files are **frozen** - they enable bootstrapping from nothing:
+
+| File | Format | Output | Status |
+|------|--------|--------|--------|
+| `src/stage0.8hex` | Raw hex | SPAZM0.COM (432 bytes) | FROZEN ✓ |
+| `src/stage1.8hex` | Raw hex | STAGE1.COM (1172 bytes) | FROZEN ✓ |
+
+**Never modify these files** - they use hardcoded addresses that Stage 0 can process.
 
 ### Stage 0 Complete ✓
 
-SPAZM0.COM (432 bytes) - hex-to-COM converter working correctly.
-
-**Bug fixed (2026-01-03)**: `CPI 1AH` in GETCHR was setting carry flag for chars < 0x1A (including LF, CR, TAB), causing MAIN's `JC DONE` to trigger premature EOF. Fixed by adding `ORA A` before RET to clear carry. See [assembler/stage0-newline-bug.md](assembler/stage0-newline-bug.md).
+SPAZM0.COM (432 bytes) - hex-to-COM converter. Reads raw hex bytes, writes `.COM`.
 
 ### Stage 1 Complete ✓
 
-STAGE1.COM (1172 bytes) - two-pass assembler with labels, ORG, END, `<`/`>` operators.
+STAGE1.COM (1172 bytes) - two-pass assembler with:
+- Labels (`LABEL:`)
+- ORG, END directives
+- Symbol references in hex (`C3 LABEL`)
+- Low/high byte operators (`<LABEL`, `>LABEL`)
 
-**Bugs fixed (2026-01-03)**:
-1. GETCHR not preserving HL - RDLINE stored chars in wrong buffer. Fixed with PUSH H/POP H.
-2. OUTPUT not preserving HL in Pass 2 - Symbol values corrupted. Fixed with PUSH H/POP H.
-3. HX_LO/HX_HI outputting both bytes - `<SYM` output 2 bytes. Fixed to call LOOKUP directly.
-
-See [assembler/stage1-testing.md](assembler/stage1-testing.md) for full test results.
-
-### Completed
-- **Phase 1**: Lode and design documentation ✓
-- **Phase 2**: MCP server added to heh8080 ✓
-  - `Heh8080.Mcp` project with 20 tools (console, memory, disk, debug)
-  - Debug tools: trace logging, breakpoints, single-step, register access
-  - Tested and verified working with LOLOS
-- **Workflow**: cpmtools-based source file sync established ✓
-- **LOLOS boot verified**: work.dsk boots, MCP console interaction works ✓
-- **Stage 0 (SPAZM0.COM)**: 432-byte hex-to-COM converter ✓
-  - Hand-assembled from `src/stage0.8hex`
-  - Converts `.HEX` files (hex bytes + `;` comments) to `.COM` binaries
-  - Multi-line support verified working
-- **Stage 1 (STAGE1.COM)**: 1158-byte two-pass assembler ✓
-  - Hand-assembled from `src/stage1.8hex` (~880 lines)
-  - Two-pass assembler with labels, ORG, END
-  - Addresses corrected with `fixaddr.py` (89 labels, 139 branches)
-  - Tested: correctly outputs `21 00 01 C9` for simple test file
+**Not yet implemented**: EQU, DB, DW, DS, expression arithmetic
 
 ### Next Steps
-1. Add DB, DW, DS directives to Stage 1
-2. Add EQU directive support
-3. Test Stage 1 self-assembly capability
-4. Iterate toward self-hosting
+1. Create `stage2.hex` in Stage 1 format (labels, not hardcoded addresses)
+2. Add DB, DW, DS, EQU directives to Stage 2
+3. Achieve self-hosting: Stage 2 assembles itself
 
 ### Resume Prompt
-"Continue spazm8080 development. Stage 1 is complete and tested. Next: add DB, DW, DS directives."
+"Continue spazm8080 development. Stage 1 is fully tested. Next: add Db, DW, DS directives or attempt self-assembly."
 
 ## Goals
 

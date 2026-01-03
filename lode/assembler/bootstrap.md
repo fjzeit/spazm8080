@@ -1,114 +1,191 @@
 # Bootstrap Strategy
 
-spazm8080 bootstraps from zero - no external assembler. We hand-assemble stage 0 in hex, inject via MCP's `PokeMemory`, then iterate.
+spazm8080 bootstraps from zero - no external assembler required.
+
+## Cold Boot Pipeline (PROTECTED)
+
+These files enable bootstrapping from nothing. **NEVER MODIFY** - they use raw hex with hardcoded addresses that Stage 0 can process.
+
+| File | Format | Assembler | Output | Size |
+|------|--------|-----------|--------|------|
+| `src/stage0.8hex` | Raw hex | Hand/xxd | `stage0.com` | 432 bytes |
+| `src/stage1.8hex` | Raw hex | Stage 0 | `stage1.com` | 1172 bytes |
+
+### Why These Are Frozen
+
+- **Stage 0 format**: Raw hex bytes + `;` comments only. No labels, no directives.
+- **Stage 1.8hex** uses hardcoded addresses like `CA C4 03` (JMP 03C4H)
+- If we add label references, Stage 0 can't assemble it → cold boot breaks
+- These files are the "seed" - everything else grows from them
+
+### Cold Boot Procedure
+
+```bash
+# From absolute zero (no binaries exist):
+xxd -r -p stage0.8hex > stage0.com      # Or hand-assemble
+cpmcp -f ibm-3740 work.dsk stage0.com 0:SPAZM0.COM
+
+# Boot CP/M, then:
+A>SPAZM0 STAGE1                          # Produces STAGE1.COM
+
+# Now Stage 1 exists and can assemble Stage 2+
+```
 
 ## Bootstrap Stages
 
 ```
+COLD BOOT (frozen, raw hex):
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 0: Hand-assembled hex bytes                          │
-│  - Injected via PokeMemory at 0100H                         │
-│  - Saved to disk via CP/M SAVE command                      │
-│  - Capabilities: ORG, DB, END only                          │
+│  Stage 0: src/stage0.8hex → SPAZM0.COM                      │
+│  Format: Raw hex bytes only                                  │
+│  Capabilities: Hex pairs + semicolon comments               │
+│  Status: COMPLETE (432 bytes)                               │
 └─────────────────────────────────────────────────────────────┘
-                              │
+                              │ assembles
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 1: Assembled by Stage 0                              │
-│  - Adds: EQU, DS, DW, labels, expressions                   │
-│  - Adds: Basic instructions (MOV, LXI, JMP, CALL, RET)      │
+│  Stage 1: src/stage1.8hex → STAGE1.COM                      │
+│  Format: Raw hex bytes only (Stage 0 input)                 │
+│  Capabilities: Labels, ORG, END, symbol refs, </>           │
+│  Status: COMPLETE (1172 bytes)                              │
 └─────────────────────────────────────────────────────────────┘
-                              │
+                              │ assembles
+                              ▼
+FORWARD DEVELOPMENT (uses Stage 1 format):
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 2: src/stage2.hex → STAGE2.COM                       │
+│  Format: Stage 1 syntax (labels, symbols)                   │
+│  New: DB, DW, DS, EQU directives                            │
+│  Goal: Self-hosting (can reassemble itself)                 │
+│  Status: NOT STARTED                                        │
+└─────────────────────────────────────────────────────────────┘
+                              │ assembles
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 2: Assembled by Stage 1                              │
-│  - Full 8080 instruction set                                │
-│  - Intel HEX output                                         │
-│  - Error messages                                           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Stage 3: Full spazm8080                                    │
-│  - Macros, conditionals                                     │
-│  - Self-hosting complete                                    │
+│  Stage 3+: Full spazm8080                                   │
+│  Format: Stage 2 syntax                                     │
+│  New: Full 8080 mnemonics, macros, conditionals             │
+│  Goal: Assemble lolos source                                │
+│  Status: NOT STARTED                                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Stage 0 Design (COMPLETED)
+## Format Comparison
 
-Minimal hex-to-COM converter. Even simpler than originally planned - just raw hex bytes.
-
-### Input Format (.HEX)
-
+### Stage 0 Format (raw hex)
 ```
-; Comment lines start with semicolon
-21 65 00        ; LXI H,0065H - bytes separated by whitespace
-36 48 23        ; MVI M,'H'; INX H
-C3 00 00        ; JMP 0000H
+; This is a comment
+21 00 01        ; LXI H,0100H - just hex bytes
+C3 00 01        ; JMP 0100H - hardcoded address
+4E 6F 24        ; "No$" - even strings are raw hex
 ```
 
-### Features
+### Stage 1 Format (labels + symbols)
+```
+        ORG 0100H
+START:
+        21 00 01        ; LXI H,0100H
+        C3 START        ; JMP START - symbolic reference
+        3E <START       ; MVI A,low(START)
+        3E >START       ; MVI A,high(START)
+MSG:    4E 6F 24        ; "No$" - still raw hex for now
+        END
+```
+
+### Stage 2 Format (planned: adds data directives)
+```
+        ORG 0100H
+BDOS    EQU 0005H
+START:
+        21 00 01        ; LXI H,0100H
+        C3 START        ; JMP START
+MSG:    DB 'No$'        ; String literal
+COUNT:  DB 10, 0AH      ; Multiple bytes
+PTR:    DW START        ; 16-bit word
+BUF:    DS 128          ; Reserve space
+        END
+```
+
+## Stage 0 Details (COMPLETE)
+
+Minimal hex-to-COM converter. Reads `.HEX`, writes `.COM`.
+
+### Input Rules
 - Hex byte pairs separated by whitespace (space, tab, CR, LF)
 - `;` starts comment until end of line
-- Outputs raw binary `.COM` file
-- **LOLOS-aware**: Handles 0x00 padding as EOF (not just 0x1A)
+- Case-insensitive (accepts `FF` or `ff`)
+- LOLOS-aware: Handles 0x00 padding as EOF
 
-### Stage 0 Memory Map (429 bytes)
-
+### Memory Map (432 bytes)
 ```
 0100-011E: Startup (open input, copy FCB, set .COM extension)
-011F-0134: COPY loop, ZERO loop
+011F-0134: FCB copy loop, zero loop
 0135-015C: Delete old/Create new output file
-015D-019A: MAIN loop - read char, skip whitespace, parse hex pairs
-019A-01A7: SKIPCMT - skip until newline
-01A8-01BD: DONE - flush buffer, close files, exit
-01BE-0200: GETCHR - buffered file reader
-0201-0229: HEXVAL - convert ASCII hex to nibble
-022A-0265: OUTPUT - buffered file writer
-0266-0276: WRSEC - write 128-byte sector
-0277-028D: Error handlers (No file, Disk full, Syntax)
-028E-02A6: Error message strings
-02A7-02AC: Variables (IPTR, ICNT, OPTR, OCNT)
-02AD-032C: Input buffer (128 bytes)
-032D-03AC: Output buffer (128 bytes)
-03AD-03CC: Output FCB (32 bytes)
+015D-019A: MAIN loop - parse hex pairs
+019A-01A7: SKIPCMT - skip to newline
+01A8-01BD: DONE - flush, close, exit
+01BE-0200: GETCHR - buffered input
+0201-0229: HEXVAL - hex char to nibble
+022A-0265: OUTPUT - buffered output
+0266-0276: WRSEC - write sector
+0277-028D: Error handlers
+028E-02A6: Error messages
+02A7+: Buffers and FCB
 ```
 
-### Key Symbols (v3 corrected addresses)
+## Stage 1 Details (COMPLETE)
 
+Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
+
+### Capabilities
+- Labels with colon suffix: `LABEL:`
+- ORG directive: `ORG 0100H`
+- END directive: `END`
+- Symbol references in hex: `C3 LABEL` → `C3 lo hi`
+- Low/high byte operators: `<LABEL`, `>LABEL`
+- Hex numbers: `0FFH`, `$FF`, decimal: `255`
+- Two-pass: forward references resolved
+
+### Memory Map (1172 bytes)
 ```
-COPY=011F  ZERO=0135  MAIN=015D  SKIPCMT=019A  DONE=01A8
-GETCHR=01BE  GC1=01E4  GC2=01FF  HEXVAL=0201  HV1=0222
-HV2=0225  HVERR=0228  OUTPUT=022A  FLUSH=024C  FL1=0254
-WRSEC=0266  NOFILE=0277  DSKFUL=027D  SYNERR=0283  ERROR=0286
-```
-
-### Lessons Learned
-
-1. **LOLOS EOF**: LOLOS pads files with 0x00, not 0x1A (CP/M standard). Must check both.
-2. **Address calculation**: Hand-assembly requires meticulous byte counting. Off-by-one errors cascade.
-3. **CP/M SAVE**: Failed on LOLOS. Used `cpmcp` from host instead.
-
-## MCP Bootstrap Workflow (Updated)
-
-```
-1. Hand-assemble stage 0 in src/stage0.hex
-2. Convert to binary: parse hex, write to src/stage0.com
-3. Copy to disk: cpmcp -f ibmpc-sssd work.dsk src/stage0.com 0:SPAZM0.COM
-4. Test: SPAZM0 MIN → should produce MIN.COM
-5. Write stage 1 source in .HEX format
-6. Assemble: SPAZM0 STAGE1
-7. Repeat for higher stages
+0100-057F: Code
+0580-058F: Variables (PASS, ICNT, IPTR, OCNT, OPTR, SYMCNT, LOCTR, LNPTR)
+0600-067F: Token buffer
+0680-06FF: Line buffer
+0700-077F: Input buffer
+0780-07FF: Output buffer
+0800-083F: Output FCB
+0840-0A3F: Symbol table (64 entries × 8 bytes)
 ```
 
-## Key Constraints
+### NOT YET IMPLEMENTED
+- EQU directive
+- DB, DW, DS directives
+- Expression arithmetic (+, -)
+- Character literals in hex context ('A')
 
-- Stage 0 must be small enough to hand-assemble reliably
-- Each stage must be able to assemble the next stage
-- Final stage must be able to re-assemble itself (self-hosting)
+## Stage 2 Plan
+
+Port Stage 1 functionality to Stage 1 format, then extend:
+
+1. **Verify bootstrap**: Write `stage2.hex` using Stage 1 syntax
+2. **Match output**: `STAGE1 STAGE2` should work (same logic, different format)
+3. **Add DB**: `DB expr, expr, 'string'`
+4. **Add DW**: `DW expr, expr` (little-endian)
+5. **Add DS**: `DS expr` (reserve bytes)
+6. **Add EQU**: `LABEL EQU expr`
+7. **Self-host**: Stage 2 assembles itself
+
+## Key Invariants
+
+1. **Cold boot files are immutable** - `stage0.8hex` and `stage1.8hex` never change
+2. **Each stage assembles the next** - Stage N produces Stage N+1
+3. **Forward compatibility** - Higher stages accept lower stage formats
+4. **Self-hosting goal** - Final stage reassembles itself identically
 
 ## Related
 
 - [architecture.md](architecture.md) - Full assembler design
+- [stage1-design.md](stage1-design.md) - Stage 1 syntax details
+- [workflow.md](workflow.md) - cpmtools sync workflow
 - [../practices.md](../practices.md) - 8080 coding patterns
