@@ -21,10 +21,10 @@ SPAZM0.COM (430 bytes) - hex-to-COM converter working correctly.
 - **Workflow**: cpmtools-based source file sync established ✓
 - **LOLOS boot verified**: work.dsk boots, MCP console interaction works ✓
 - **Stage 0 (SPAZM0.COM)**: 430-byte hex-to-COM converter ✓
-  - Hand-assembled from `src/stage0.hex`
+  - Hand-assembled from `src/stage0.8hex`
   - Converts `.HEX` files (hex bytes + `;` comments) to `.COM` binaries
   - Multi-line support verified working
-- **Stage 1 source**: Written in `src/stage1.hex` (~870 lines)
+- **Stage 1 source**: Written in `src/stage1.8hex` (~870 lines)
   - Two-pass assembler with labels, ORG, END, EQU
   - Addresses corrected with `fixaddr.py` (89 labels, 139 branches verified)
   - Ready to assemble with SPAZM0
@@ -94,6 +94,6 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | `lode/practices.md` | Assembly coding patterns |
 | `scripts/fixaddr.py` | Address correction for hand-assembled hex |
 | `src/stage0.asm` | Stage 0 documented source |
-| `src/stage0.hex` | Stage 0 hand-assembled bytes |
+| `src/stage0.8hex` | Stage 0 hand-assembled bytes |
 | `src/stage0.com` | Stage 0 binary (430 bytes) |
-| `src/stage1.hex` | Stage 1 hand-assembled source (1155 bytes) |
+| `src/stage1.8hex` | Stage 1 hand-assembled source (1155 bytes) |

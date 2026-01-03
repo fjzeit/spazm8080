@@ -4,13 +4,14 @@ lode/tmp/
 # Working disk image (restore from lolos if needed)
 work.dsk
 
-# Build outputs
+# Build outputs (interim files)
 *.hex
 *.bin
 *.com
 *.lst
 
-!src/stage1.hex
+# Bootstrap sources use .8hex extension (tracked)
+!*.8hex
 
 # Editor backups
 *~
