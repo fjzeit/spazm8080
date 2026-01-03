@@ -382,7 +382,9 @@ CKDX:
         E6 DF           ; ANI 0DFH
         FE 42           ; CPI 'B'
         CA GODEF        ; JZ GO_DEFB
-; Future: DEFW, DEFS checks here
+        FE 57           ; CPI 'W'
+        CA GODEW        ; JZ GO_DEFW
+; Future: DEFS check here
 CKDXN:
 ; Not a D-directive, restore LNPTR
         2A DA 08        ; LHLD LNPTR
@@ -464,6 +466,40 @@ DBEND:
         36 00           ; MVI M,0
         22 DA 08        ; SHLD LNPTR
         C9              ; RET
+
+; ============================================================
+; GO_DEFW - Parse DEFW directive
+; Syntax: DEFW expr, expr (no strings)
+; ============================================================
+GODEW:
+        23              ; INX H (skip 'W' of DEFW)
+        22 DA 08        ; SHLD LNPTR
+
+DWLP:
+        CD SKIPWS       ; skip whitespace
+        2A DA 08        ; LHLD LNPTR
+        7E              ; MOV A,M
+        B7              ; ORA A
+        CA DBEND        ; JZ end
+        FE 3B           ; CPI ';'
+        CA DBEND        ; JZ end (comment)
+
+; Parse expression as word
+        CD EXPR         ; get value -> HL
+        7D              ; MOV A,L
+        CD OUTPUT       ; emit low byte
+        7C              ; MOV A,H
+        CD OUTPUT       ; emit high byte
+
+; Check for comma
+        CD SKIPWS       ; skip whitespace
+        2A DA 08        ; LHLD LNPTR
+        7E              ; MOV A,M
+        FE 2C           ; CPI ','
+        C2 DBEND        ; JNZ done
+        23              ; INX H (skip comma)
+        22 DA 08        ; SHLD LNPTR
+        C3 DWLP         ; JMP loop
 
 ; ============================================================
 ; HEXLN - Parse hex bytes with symbols
