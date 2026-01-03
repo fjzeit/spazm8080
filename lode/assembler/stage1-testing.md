@@ -157,7 +157,16 @@ AF; XRA A
 32 F1 06; STA ICNT
 ```
 
-This is standard CP/M behavior - Open loads the FCB with extent 0's disk allocation blocks.
+**Verified as standard CP/M 2.2 behavior** (not a LOLOS bug):
+
+1. BDOS GETBLOCK reads disk block numbers directly from FCB+16 (D0-D15)
+2. BDOS Open (function 15) copies the allocation map from directory entry to FCB
+3. Read Sequential only auto-reloads allocation when CR overflows (extent boundary crossing)
+4. Manually resetting EX/CR does NOT trigger an allocation reload
+
+From [CP/M FCB documentation](https://www.seasip.info/Cpm/fcb.html): "If the cr field overflows, the next logical extent is automatically opened" - but only on overflow, not manual reset.
+
+For single-extent files (<16KB), simple EX/CR reset works. For multi-extent files requiring a rewind, you must call Open to reload extent 0's allocation blocks.
 
 ## Code Size History
 

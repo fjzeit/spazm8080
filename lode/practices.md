@@ -189,3 +189,23 @@ PASS:   DB      1               ; Current pass (1 or 2)
         CPI     2
         JNZ     SKIP_EMIT       ; Only emit on pass 2
 ```
+
+### File Rewind for Multi-Pass (CP/M 2.2)
+
+**Critical**: For multi-extent files (>16KB), you must RE-OPEN to rewind:
+
+```asm
+; Rewind input file for pass 2
+        XRA     A
+        STA     FCB+32          ; Reset CR (current record)
+        STA     FCB+12          ; Reset EX (extent)
+        LXI     D, FCB
+        MVI     C, 15           ; BDOS Open File
+        CALL    5               ; Reloads extent 0 allocation
+```
+
+**Why**: CP/M's Read Sequential uses allocation blocks (FCB+16..+31) directly. Open copies the directory entry's allocation map into the FCB. Simply resetting EX/CR doesn't reload the allocation - the FCB still points to the last extent's disk blocks.
+
+**Exception**: Single-extent files (<16KB) work with just CR reset since extent 0 is already loaded.
+
+See `lode/assembler/stage1-testing.md` Bug 7 for verification against CP/M internals.
