@@ -1,6 +1,24 @@
 # spazm8080 Architecture
 
-## Overview
+## Implementation Status
+
+This document describes the **target architecture** for the full spazm8080 assembler. Current implementation is simpler:
+
+| Feature | Stage 1/2 (Current) | Final Target |
+|---------|---------------------|--------------|
+| Symbol table entry | 8 bytes (6 name + 2 value) | 16 bytes (with flags) |
+| Output format | Raw .COM binary | Intel HEX or .COM |
+| Lexer | Inline parsing | Separate module |
+| Macros | Not implemented | Full MACRO/ENDM |
+| Conditionals | Not implemented | IF/ELSE/ENDIF |
+| Expressions | +, -, <, > only | Full operator set |
+| Instructions | Raw hex bytes | 8080 mnemonics |
+
+Current Stage 2: 1408 bytes, self-hosting, hex bytes + labels.
+
+See [bootstrap.md](bootstrap.md) for current stage details.
+
+## Target Overview
 
 spazm8080 is a two-pass macro assembler. Pass 1 builds the symbol table and calculates addresses. Pass 2 generates code and writes output.
 

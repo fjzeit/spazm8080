@@ -8,45 +8,41 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ### Cold Boot Pipeline (PROTECTED)
 
-| File | Format | Assembler | Output | Status |
-|------|--------|-----------|--------|--------|
-| `src/stage0.8hx` | Raw hex only | Hand/trivial | SPAZM0.COM (432 bytes) | FROZEN |
-| `src/stage1.8hx` | Raw hex + comments | SPAZM0 | STAGE1.COM (1296 bytes) | Complete |
-| `src/stage2.8hx` | Labels + directives | STAGE1 | STAGE2.COM (1408 bytes) | **SELF-HOSTING** |
+| File | Format | Assembler | Output | Size |
+|------|--------|-----------|--------|------|
+| `src/stage0.8hx` | Raw hex only | Hand/xxd | SPAZM0.COM | 432 bytes |
+| `src/stage1.8hx` | Raw hex + comments | SPAZM0 | STAGE1.COM | 1296 bytes |
+| `src/stage2.8hx` | Labels + directives | STAGE1 | STAGE2.COM | 1408 bytes |
 
 *stage1.8hx can be modified but **must remain in Stage 0 format** (raw hex bytes). Use `fixaddr.py` after edits.
 
-### Stage 0 Complete ✓
+### Implemented Features
 
-SPAZM0.COM (432 bytes) - hex-to-COM converter. Reads raw hex bytes, writes `.COM`.
-
-### Stage 1 Complete ✓
-
-STAGE1.COM (1296 bytes) - two-pass assembler with:
-- Labels (`LABEL:`)
-- ORG, END directives
-- Symbol references in hex (`C3 LABEL`)
-- Low/high byte operators (`<LABEL`, `>LABEL`)
+- **Two-pass assembly**: Forward references resolved via symbol table
+- **Labels**: `LABEL:` defines symbol at current address
+- **Directives**: ORG, END
+- **Symbol references**: `C3 LABEL` emits address bytes
+- **Low/high byte operators**: `<LABEL`, `>LABEL`
 - **Token-length parsing**: 2 chars=byte, 4 chars=word, else=label
-- **Proper file rewind** for pass 2 (re-open to reload extent 0)
-- **CHKDIR fix**: Distinguishes `END` from hex bytes like `E5`
+- **Self-hosting**: Stage 2 assembles itself identically
 
-**Not yet implemented**: EQU, DB, DW, DS, expression arithmetic
+### Not Yet Implemented
 
-### Stage 2 Complete + Self-Hosting ✓
-
-STAGE2.COM (1408 bytes) - identical logic to Stage 1, written in Stage 1 format.
-- Successfully assembles itself: `STAGE2 STAGE2` produces identical binary
-- Circular bootstrap verified
+- EQU directive
+- DB, DW, DS directives
+- Expression arithmetic (+, -)
 
 ### Next Steps
-1. Add DB directive to stage2
-2. Add DW directive to stage2
-3. Add DS directive to stage2
-4. Add EQU directive to stage2
+
+See [plans/directive-impl.md](plans/directive-impl.md) for implementation plan:
+1. Add EQU directive (simplest, no output)
+2. Add DB directive (strings and bytes)
+3. Add DW directive (16-bit words)
+4. Add DS directive (reserve space)
 
 ### Resume Prompt
-"Continue spazm8080 development. Stage 2 is self-hosting. Next: add DB/DW/DS/EQU directives to stage2."
+
+"Continue spazm8080 development. Stage 2 is self-hosting. Next: add EQU directive to stage2 following plans/directive-impl.md."
 
 ## Goals
 
@@ -70,7 +66,7 @@ Development uses heh8080 emulator with MCP server integration, enabling Claude t
 - Must fit in CP/M TPA (under 60KB)
 - 8-bit arithmetic only (16-bit via register pairs)
 - No dynamic memory allocation (fixed buffers)
-- Single-file source input (with INCLUDE support)
+- Single-file source input (with INCLUDE support planned)
 
 ## Related Projects
 
@@ -100,10 +96,10 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | `lode/assembler/architecture.md` | Two-pass design, data structures, module APIs |
 | `lode/assembler/bootstrap.md` | Stage 0-3 bootstrap strategy, cold boot protection |
 | `lode/assembler/workflow.md` | cpmtools sync, **fixaddr.py** (critical for .8hx edits) |
-| `lode/assembler/stage1-testing.md` | Bug fixes and test results |
+| `lode/assembler/stage1-testing.md` | Design lessons from Stage 1/2 development |
 | `lode/terminology.md` | 8080/Z80/CP/M vocabulary |
 | `lode/practices.md` | Assembly coding patterns |
 | `scripts/fixaddr.py` | **Critical**: Address correction after .8hx edits |
 | `src/stage0.8hx` | Stage 0 source - FROZEN |
-| `src/stage1.8hx` | Stage 1 source (1280 bytes) - raw hex format |
+| `src/stage1.8hx` | Stage 1 source (1296 bytes) - raw hex format |
 | `src/stage2.8hx` | Stage 2 source (1408 bytes) - self-hosting |

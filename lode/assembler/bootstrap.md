@@ -4,10 +4,11 @@ spazm8080 bootstraps from zero - no external assembler required.
 
 ## Cold Boot Pipeline (PROTECTED)
 
-| File | Format | Assembler | Output | Size | Status |
-|------|--------|-----------|--------|------|--------|
-| `src/stage0.8hx` | Raw hex | Hand/xxd | `stage0.com` | 432 bytes | **FROZEN** |
-| `src/stage1.8hx` | Raw hex | Stage 0 | `stage1.com` | 1280 bytes | Editable* |
+| File | Format | Assembler | Output | Size |
+|------|--------|-----------|--------|------|
+| `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes |
+| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes |
+| `src/stage2.8hx` | Stage 1 syntax | STAGE1 | STAGE2.COM | 1408 bytes |
 
 ### What's FROZEN vs Editable
 
@@ -37,10 +38,14 @@ cpmcp -f ibm-3740 work.dsk /tmp/spazm0.com 0:SPAZM0.COM
 cpmcp -f ibm-3740 work.dsk src/stage1.8hx 0:STAGE1.HEX
 
 # 4. Boot CP/M and assemble Stage 1
-A>SPAZM0 STAGE1                          # Produces STAGE1.COM
+A>SPAZM0 STAGE1                          # Produces STAGE1.COM (1296 bytes)
 
-# 5. Now Stage 1 exists and can assemble Stage 2+
-A>STAGE1 STAGE2                          # Produces STAGE2.COM
+# 5. Copy Stage 2 source and assemble
+cpmcp -f ibm-3740 work.dsk src/stage2.8hx 0:STAGE2.HEX
+A>STAGE1 STAGE2                          # Produces STAGE2.COM (1408 bytes)
+
+# 6. Verify self-hosting
+A>STAGE2 STAGE2                          # Should produce identical STAGE2.COM
 ```
 
 **Note**: The `sed 's/;.*//'` strips comments before `xxd -r -p` converts hex to binary.
@@ -61,7 +66,7 @@ COLD BOOT (frozen, raw hex):
 │  Stage 1: src/stage1.8hx → STAGE1.COM                      │
 │  Format: Raw hex bytes only (Stage 0 input)                 │
 │  Capabilities: Labels, ORG, END, symbol refs, </>           │
-│  Status: COMPLETE (1280 bytes, 7 bugs fixed)                │
+│  Status: COMPLETE (1296 bytes)                              │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
@@ -71,7 +76,7 @@ FORWARD DEVELOPMENT (uses Stage 1 format):
 │  Format: Stage 1 syntax (labels, symbols)                   │
 │  Capabilities: Same as Stage 1 (labels, ORG, END, </>)      │
 │  Status: COMPLETE + SELF-HOSTING (1408 bytes)               │
-│  Note: DB, DW, DS, EQU directives pending                   │
+│  Next: Adding DB, DW, DS, EQU directives                    │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
@@ -120,7 +125,7 @@ BUF:    DS 128          ; Reserve space
         END
 ```
 
-## Stage 0 Details (COMPLETE)
+## Stage 0 Details
 
 Minimal hex-to-COM converter. Reads `.HEX`, writes `.COM`.
 
@@ -147,7 +152,7 @@ Minimal hex-to-COM converter. Reads `.HEX`, writes `.COM`.
 02A7+: Buffers and FCB
 ```
 
-## Stage 1 Details (COMPLETE)
+## Stage 1 Details
 
 Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
 
@@ -160,7 +165,7 @@ Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
 - Hex numbers: `0FFH`, `$FF`, decimal: `255`
 - Two-pass: forward references resolved
 
-### Memory Map (1280 bytes)
+### Memory Map (1296 bytes)
 ```
 0100-05FF: Code (ends ~0x0600)
 0600-067F: Token buffer
@@ -172,7 +177,7 @@ Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
 0840-0A3F: Symbol table (64 entries × 8 bytes)
 ```
 
-### NOT YET IMPLEMENTED
+### Not Yet Implemented
 - EQU directive
 - DB, DW, DS directives
 - Expression arithmetic (+, -)
@@ -182,13 +187,13 @@ Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
 
 Port Stage 1 functionality to Stage 1 format, then extend:
 
-1. **Verify bootstrap**: Write `stage2.hex` using Stage 1 syntax
-2. **Match output**: `STAGE1 STAGE2` should work (same logic, different format)
-3. **Add DB**: `DB expr, expr, 'string'`
-4. **Add DW**: `DW expr, expr` (little-endian)
-5. **Add DS**: `DS expr` (reserve bytes)
-6. **Add EQU**: `LABEL EQU expr`
-7. **Self-host**: Stage 2 assembles itself
+1. **Verify bootstrap**: Write `stage2.hex` using Stage 1 syntax ✓
+2. **Match output**: `STAGE1 STAGE2` works ✓
+3. **Self-host**: Stage 2 assembles itself ✓
+4. **Add EQU**: `LABEL EQU expr` (pending)
+5. **Add DB**: `DB expr, expr, 'string'` (pending)
+6. **Add DW**: `DW expr, expr` (little-endian) (pending)
+7. **Add DS**: `DS expr` (reserve bytes) (pending)
 
 ## Key Invariants
 
@@ -203,5 +208,6 @@ Port Stage 1 functionality to Stage 1 format, then extend:
 
 - [architecture.md](architecture.md) - Full assembler design
 - [stage1-design.md](stage1-design.md) - Stage 1 syntax details
+- [stage1-testing.md](stage1-testing.md) - Design lessons learned
 - [workflow.md](workflow.md) - cpmtools sync workflow
 - [../practices.md](../practices.md) - 8080 coding patterns

@@ -114,7 +114,25 @@ Add `--mcp` flag to start MCP server on stdio transport.
 
 ---
 
-## Phase 3: Develop spazm8080 using MCP
+## Phase 3: Develop spazm8080 using MCP - IN PROGRESS
+
+### 3.1 Stage 0 Complete ✓
+SPAZM0.COM (432 bytes) - hex-to-COM converter
+
+### 3.2 Stage 1 Complete ✓
+STAGE1.COM (1296 bytes) - two-pass assembler with labels, ORG, END, </>
+
+### 3.3 Stage 2 Self-Hosting ✓
+STAGE2.COM (1408 bytes) - Stage 1 logic in Stage 1 format
+- Successfully assembles itself
+- Circular bootstrap verified
+
+### 3.4 Adding Directives (Current)
+See [directive-impl.md](directive-impl.md) for detailed plan.
+- EQU: Define constant
+- DB: Define bytes/strings
+- DW: Define words
+- DS: Define space
 
 With MCP server running, Claude can:
 1. Write assembly source files to disk via `write_file`

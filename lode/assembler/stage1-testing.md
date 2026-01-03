@@ -1,234 +1,148 @@
-# Stage 1 Assembler - Testing and Bug Fixes
+# Stage 1/2 Assembler - Design Lessons
 
-## Overview
+Lessons learned building Stage 1 (raw hex) and Stage 2 (self-hosting) assemblers.
 
-Stage 1 (STAGE1.COM) is a two-pass assembler built from hand-assembled hex code. It was tested on 2026-01-03 after fixing several critical bugs.
+## Core Architecture
 
-## Test Results Summary
+Stage 1/2 implements a two-pass assembler that processes hex bytes with symbolic labels:
+- **Pass 1**: Collect labels, calculate addresses, don't emit code
+- **Pass 2**: Resolve references, emit bytes
 
-| Test | Description | Expected | Result |
-|------|-------------|----------|--------|
-| Simple hex | `21 00 01; C9` | `21 00 01 C9` | PASS |
-| Symbol refs | `C3 START` where START=0100 | `C3 00 01` | PASS |
-| Low byte | `3E <TARGET` where TARGET=0100 | `3E 00` | PASS |
-| High byte | `3E >TARGET` where TARGET=0100 | `3E 01` | PASS |
-| ORG directive | `ORG 0200H` then label | Label at 0200 | PASS |
-| Forward refs | `C3 LATER` before LATER defined | Correct address | PASS |
+Current sizes: Stage 1 = 1296 bytes, Stage 2 = 1408 bytes (self-hosting).
 
-## Bugs Found and Fixed
+## Critical Design Patterns
 
-### Bug 1: GETCHR trashes HL register (fixed)
+### Register Preservation
 
-**Symptom**: 0-byte output files. RDLINE filled input buffer (IBUF) instead of line buffer (LINBUF).
+**Lesson**: Any function that modifies HL, BC, or DE must preserve caller's values if caller depends on them.
 
-**Root cause**: GETCHR uses HL for input buffer pointer (LHLD IPTR, INX H, SHLD IPTR) but didn't preserve caller's HL. RDLINE uses HL to track position in LINBUF at 0x0680, but after GETCHR returned, HL pointed into IBUF at 0x0700+.
+Functions like GETCHR (buffered input) and OUTPUT (buffered output) use HL internally. Callers like RDLINE depend on HL for line buffer position. Solution: PUSH/POP at function boundaries.
 
-**Fix**: Added `PUSH H` at GETCHR entry and `POP H` at both exit points.
-
-```
-; GETCHR entry
-C5; PUSH B
-E5; PUSH H  <- Added
-
-; Normal return
-E1; POP H   <- Added
-C1; POP B
-C9; RET
-
-; EOF return
-E1; POP H   <- Added
-C1; POP B
-37; STC
-C9; RET
+```asm
+GETCHR:
+    PUSH B
+    PUSH H          ; Critical: preserve caller's HL
+    ; ... internal work using HL ...
+    POP H
+    POP B
+    RET
 ```
 
-### Bug 2: OUTPUT trashes HL register in Pass 2 (fixed)
+### Token-Length Parsing
 
-**Symptom**: Symbol references output wrong addresses (e.g., 0x0700 instead of 0x0100).
+**Lesson**: Distinguishing hex bytes from labels by character count is simpler than requiring syntax markers.
 
-**Root cause**: Pass 2 OUTPUT path does `LHLD OPTR` which overwrites HL. After HX_SYM called LOOKUP (returns value in HL), the first CALL OUTPUT trashed HL. The second byte output used the output buffer pointer instead of the symbol value.
+Rules:
+- 2 hex chars = byte (`C3` → 0xC3)
+- 4 hex chars = word, little-endian (`0100` → 0x00, 0x01)
+- Other = label reference (lookup in symbol table)
 
-**Fix**: Added `PUSH H` at Pass 2 entry and `POP H` before all returns.
+This eliminates need for special prefixes while remaining unambiguous.
 
-```
-; Pass 2 - output byte
-E5; PUSH H  <- Added
-F5; PUSH PSW
-2A 85 05; LHLD OPTR
-...
-E1; POP H   <- Added before each RET
-C9; RET
-```
+### Directive Detection
 
-### Bug 3: HX_LO and HX_HI output both bytes (fixed)
+**Lesson**: Single-character prefix detection fails when hex bytes share that prefix.
 
-**Symptom**: `<SYMBOL` and `>SYMBOL` output 2 bytes instead of 1.
+Problem: `E5` (PUSH H opcode) starts with 'E', same as `END`. Checking only first char causes E5 to be interpreted as END directive.
 
-**Root cause**: Both HX_LO and HX_HI called HX_SYM, which outputs BOTH low and high bytes. They should call LOOKUP directly and output only the appropriate byte.
+Solution: After matching 'E', verify second char is 'N' before treating as END. 'O' can immediately match ORG since no hex byte starts with O.
 
-**Fix**: Rewrote HX_LO and HX_HI to call LOOKUP directly:
+### CP/M File Rewind
 
-```
-; HX_LO - Low byte prefix (<SYMBOL)
-23; INX H (skip '<')
-22 8A 05; SHLD LNPTR
-CD xx xx; CALL LOOKUP
-7D; MOV A,L  <- Only output L
-CD xx xx; CALL OUTPUT
-C3 7C 02; JMP HEXLN
+**Lesson**: In CP/M 2.2, resetting FCB extent/record fields is NOT sufficient to rewind a file.
 
-; HX_HI - High byte prefix (>SYMBOL)
-23; INX H (skip '>')
-22 8A 05; SHLD LNPTR
-CD xx xx; CALL LOOKUP
-7C; MOV A,H  <- Only output H
-CD xx xx; CALL OUTPUT
-C3 7C 02; JMP HEXLN
+The FCB contains allocation block pointers (FCB+16..+31) that map logical records to physical disk blocks. These are loaded from the directory entry only during OPEN. Simply setting EX=0 and CR=0 leaves stale allocation pointers from the last extent accessed.
+
+**Solution**: Re-open the file to reload extent 0's allocation map:
+```asm
+P1END:
+    XRA A
+    STA FCB+32      ; Reset current record
+    STA FCB+12      ; Reset extent
+    LXI D, FCB
+    MVI C, 15       ; BDOS Open
+    CALL 5          ; Reloads allocation from directory
 ```
 
-### Bug 4: CD_END doesn't update LNPTR (fixed)
+Single-extent files (<16KB) work without re-open since extent 0 is already loaded.
 
-**Symptom**: 0-byte output files when assembling source with label references. Simple hex without labels worked fine.
+### Memory Layout Discipline
 
-**Root cause**: The END directive handler (CD_END) set LINBUF[0]=0 to force end-of-file detection, but didn't update LNPTR. After CD_END returned, the PARSE function called HEXLN, which read from LNPTR still pointing into the "END" text. HEXLN tried to parse "ND" as a symbol reference, causing garbage processing.
+**Lesson**: Code growth must not overlap data areas.
 
-**Fix**: Set LNPTR to point to the cleared LINBUF so HEXLN sees an empty line:
+Original layout put variables at 0x0580, but code grew beyond that. Solution: Place variables after code with margin (0x06F0), and use explicit address constants.
 
+Current layout:
 ```
-; CD_END - END directive (old - 8 bytes)
-21 00 00; LXI H,0
-7D; MOV A,L
-32 80 06; STA LINBUF
-C9; RET
-
-; CD_END - END directive (new - 9 bytes)
-21 80 06; LXI H,LINBUF (0680H)
-36 00; MVI M,0
-22 8A 05; SHLD LNPTR  <- Key fix: update pointer
-C9; RET
+0100-061F: Code
+0620-069F: Token buffer (TOKBUF)
+06A0-06EF: Line buffer
+06F0-06FB: Variables (PASS, ICNT, IPTR, OCNT, OPTR, SYMCNT, LOCTR, LNPTR)
+0700-077F: Input buffer
+0780-07FF: Output buffer
+0800-083F: Output FCB
+0840+:     Symbol table (8 bytes/entry: 6 name + 2 value)
 ```
 
-**Note**: Used `fixaddr.py` to automatically recalculate all 155 affected address references after this 1-byte expansion.
+### Two-Pass Symbol Resolution
 
-### Bug 5: Token-length parsing needed (fixed)
+**Lesson**: Pass 1 defines symbols, Pass 2 resolves them. Keep them separate.
 
-**Symptom**: Needed cleaner way to distinguish hex bytes from label references without `:` prefix.
-
-**Solution**: Rewrote HEXLN with token-scanning approach:
-- 2 hex chars = byte (e.g., `C3` → 0xC3)
-- 4 hex chars = word, little-endian (e.g., `0100` → 0x00, 0x01)
-- Otherwise = label reference (e.g., `LOOP` → address lookup)
-
-The scanner counts token length and checks if all chars are hex digits. This is simpler than requiring a `:` prefix for labels.
-
-### Bug 6: Code/variable address overlap (fixed)
-
-**Symptom**: 0-byte output, corrupted behavior. Variables at 0x0580 were overwritten by code.
-
-**Root cause**: Code grew to 1268 bytes (ends at 0x05F4) but variables were at 0x0580-0x058F. Code was overwriting its own variables!
-
-**Fix**: Relocated all variables from 058x to 06Fx:
-- PASS: 06F0
-- ICNT: 06F1
-- IPTR: 06F2 (2 bytes)
-- OCNT: 06F4
-- OPTR: 06F5 (2 bytes)
-- SYMCNT: 06F7
-- LOCTR: 06F8 (2 bytes)
-- LNPTR: 06FA (2 bytes)
-
-Used sed to bulk-replace addresses, then `fixaddr.py` for jump targets.
-
-### Bug 7: File not rewound for pass 2 (fixed)
-
-**Symptom**: "Undef" error on valid symbols. Pass 2 read from middle of file instead of start.
-
-**Root cause**: In CP/M 2.2, simply resetting FCB+12 (extent) and FCB+32 (CR) to 0 doesn't reload extent 0's allocation block pointers. The FCB still has allocation info from the last extent accessed in pass 1.
-
-**Fix**: Re-open the file at P1END to reload extent 0 information:
-```
-AF; XRA A
-32 7C 00; STA FCB+32 (reset CR)
-32 68 00; STA FCB+12 (reset extent)
-11 5C 00; LXI D,FCB
-0E 0F; MVI C,15 (open file)
-CD 05 00; CALL BDOS
-AF; XRA A
-32 F1 06; STA ICNT
+In Pass 1, OUTPUT only increments LOCTR (no disk writes). In Pass 2, OUTPUT writes bytes. The PASS variable controls behavior:
+```asm
+OUTPUT:
+    PUSH PSW
+    LDA PASS
+    ORA A
+    JZ OUT_P1       ; Pass 1: just count
+    ; Pass 2: actually write
 ```
 
-**Verified as standard CP/M 2.2 behavior** (not a LOLOS bug):
+Forward references work because all symbols exist by Pass 2.
 
-1. BDOS GETBLOCK reads disk block numbers directly from FCB+16 (D0-D15)
-2. BDOS Open (function 15) copies the allocation map from directory entry to FCB
-3. Read Sequential only auto-reloads allocation when CR overflows (extent boundary crossing)
-4. Manually resetting EX/CR does NOT trigger an allocation reload
+## Symbol Table Design
 
-From [CP/M FCB documentation](https://www.seasip.info/Cpm/fcb.html): "If the cr field overflows, the next logical extent is automatically opened" - but only on overflow, not manual reset.
+Simple linear table with 8-byte entries:
+- Bytes 0-5: Name (uppercase, space-padded)
+- Bytes 6-7: Value (16-bit little-endian)
 
-For single-extent files (<16KB), simple EX/CR reset works. For multi-extent files requiring a rewind, you must call Open to reload extent 0's allocation blocks.
+Linear search via SYMCNT counter. Adequate for ~100 symbols; hash table for larger codebases.
 
-## Code Size History
+LOOKUP extracts symbol from input, searches table, returns value in HL.
+DEFSYM copies name to table, stores current LOCTR as value.
 
-| Version | Size | Changes |
-|---------|------|---------|
-| Initial | 1155 bytes | Hand-assembled |
-| +GETCHR fix | 1158 bytes | +3 bytes (PUSH H, 2x POP H) |
-| +OUTPUT fix | 1164 bytes | +6 bytes (PUSH H, restructured returns) |
-| +HX_LO/HI fix | 1172 bytes | +8 bytes (separate LOOKUP calls) |
-| +CD_END fix | 1173 bytes | +1 byte (SHLD LNPTR) |
-| +Token-length HEXLN | 1268 bytes | Rewrote hex parsing |
-| +Variable relocation | 1268 bytes | 058x → 06Fx (code/data overlap fix) |
-| +File rewind fix | 1280 bytes | +12 bytes (re-open + extent reset) |
+## Error Handling
 
-## Testing Workflow
+Minimal error messages (save code space):
+- "No file" - input file not found
+- "Disk full" - output write failed
+- "Undef" - undefined symbol in Pass 2
 
-1. Prepare fresh disk:
-   ```bash
-   cp path/to/lolos.dsk work.dsk
+Print message, jump to CP/M warm boot (0x0000).
 
-   # Generate SPAZM0.COM from stage0.8hx (cold boot method):
-   sed 's/;.*//' src/stage0.8hx | xxd -r -p > /tmp/spazm0.com
-   cpmcp -f ibm-3740 work.dsk /tmp/spazm0.com 0:SPAZM0.COM
+## Testing Approach
 
-   cpmcp -f ibm-3740 work.dsk src/stage1.8hx 0:STAGE1.HEX
-   ```
+1. Start with simplest case (hex bytes only)
+2. Add one feature at a time (labels, ORG, END)
+3. Verify self-assembly: `STAGE2 STAGE2` must produce identical binary
+4. Use binary comparison (`cmp`) to verify byte-for-byte match
 
-2. Mount and build in emulator:
-   ```
-   A>spazm0 stage1
-   ```
+## Cold Bootstrap Verification
 
-3. Run test:
-   ```
-   A>stage1 testfile
-   ```
+The bootstrap chain must always work from raw hex:
+```
+stage0.8hx → xxd → SPAZM0.COM (raw hex only)
+stage1.8hx → SPAZM0 → STAGE1.COM (raw hex format)
+stage2.8hx → STAGE1 → STAGE2.COM (labels allowed)
+stage2.8hx → STAGE2 → STAGE2.COM (self-hosting verified)
+```
 
-4. Extract and verify:
-   ```bash
-   cpmcp -f ibm-3740 work.dsk 0:TESTFILE.COM /tmp/test.com
-   xxd /tmp/test.com
-   ```
+Any change to stage1.8hx requires `fixaddr.py` to recalculate jump targets.
+Stage2.8hx must NOT use features that STAGE1 doesn't understand.
 
-## Key Lessons
+## Related Files
 
-1. **Register preservation is critical**: Any function that uses HL, BC, or DE must preserve caller's values if the caller depends on them.
-
-2. **Two-pass assembler works**: Forward references are correctly resolved because Pass 1 collects all labels before Pass 2 generates output.
-
-3. **Disk sync matters**: The emulator's disk image must be remounted after host-side modifications.
-
-4. **Test incrementally**: Each feature (hex, labels, <, >, ORG, forward refs) should be tested separately.
-
-## Resume Prompt
-
-"Continue spazm8080 development. Stage 1 is complete (1280 bytes, 7 bugs fixed). STAGE1.COM successfully assembled stage2.8hx producing 1280 bytes. Next steps: (1) Update stage2.8hx with current stage1 fixes for full circular bootstrap, (2) Add DB/DW/DS/EQU support."
-
-## Milestone Achieved: 2026-01-03
-
-**Stage 1 successfully assembles label-based source files.**
-
-- Token-length parsing works: 2 chars=byte, 4 chars=word, else=label
-- Forward references resolve correctly across two passes
-- CP/M file rewind properly implemented (re-open to reload extent 0)
-- STAGE1.COM (1280 bytes) assembled stage2.8hx → STAGE2.COM (1280 bytes)
+- [bootstrap.md](bootstrap.md) - Cold boot pipeline, stage progression
+- [stage1-design.md](stage1-design.md) - Syntax specification
+- [../practices.md](../practices.md) - 8080 coding patterns including file rewind
+- [../plans/directive-impl.md](../plans/directive-impl.md) - Next: DB/DW/DS/EQU

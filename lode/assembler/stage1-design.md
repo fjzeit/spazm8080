@@ -2,6 +2,23 @@
 
 Stage 1 extends Stage 0's hex format with labels, directives, and expressions. Two-pass assembly enables forward references.
 
+## Implementation Status
+
+| Feature | Status |
+|---------|--------|
+| Labels (LABEL:) | Implemented |
+| ORG directive | Implemented |
+| END directive | Implemented |
+| Symbol refs (C3 LABEL) | Implemented |
+| Low/high byte (<, >) | Implemented |
+| Token-length parsing | Implemented |
+| EQU directive | **Not implemented** |
+| DB/DW/DS directives | **Not implemented** |
+| String literals | **Not implemented** |
+| Expression arithmetic (+, -) | **Not implemented** |
+
+See [stage1-testing.md](stage1-testing.md) for bug fixes and milestones.
+
 ## Input Format
 
 ```
@@ -90,45 +107,35 @@ Symbol reference rules:
 └─────────────────────────────────────────────────────┘
 ```
 
-## Memory Layout
+## Memory Layout (Actual Stage 1/2 Implementation)
 
 ```
-0100-03FF: Code (~768 bytes estimated)
-0400-05FF: Symbol table (128 entries × 4 bytes = 512 bytes)
-0600-067F: Line buffer (128 bytes)
-0680-06FF: Token buffer (128 bytes)
+0100-061F: Code (~1296-1408 bytes)
+0620-069F: Token buffer (128 bytes)
+06A0-06EF: Line buffer (80 bytes)
+06F0-06FB: Variables (12 bytes):
+           06F0: PASS    (1 byte)
+           06F1: ICNT    (1 byte)
+           06F2: IPTR    (2 bytes)
+           06F4: OCNT    (1 byte)
+           06F5: OPTR    (2 bytes)
+           06F7: SYMCNT  (1 byte)
+           06F8: LOCTR   (2 bytes)
+           06FA: LNPTR   (2 bytes)
 0700-077F: Input buffer (128 bytes)
 0780-07FF: Output buffer (128 bytes)
-0800-083F: Input FCB (64 bytes with work area)
-0840-087F: Output FCB (64 bytes with work area)
-0880+: Available for larger programs
+0800-083F: Output FCB (64 bytes)
+0840+:     Symbol table (8 bytes per entry)
 ```
 
-### Symbol Table Entry (4 bytes)
+### Symbol Table Entry (8 bytes)
 ```
-+0: Name hash (1 byte) - for fast lookup
-+1: Value low (1 byte)
-+2: Value high (1 byte)
-+3: Flags (1 byte) - bit 0: defined, bit 7: in-use
-```
-
-Symbol names stored separately in name table:
-```
-0600-07FF: Name strings (512 bytes)
-           Each entry: length byte + up to 8 chars
++0-5: Name (6 chars, uppercase, space-padded)
++6:   Value low byte
++7:   Value high byte
 ```
 
-Revised layout with name table:
-```
-0100-04FF: Code (~1KB)
-0500-05FF: Symbol entries (64 entries × 4 bytes = 256 bytes)
-0600-07FF: Symbol names (64 entries × 8 bytes avg = 512 bytes)
-0800-087F: Line buffer (128 bytes)
-0880-08FF: Input buffer (128 bytes)
-0900-097F: Output buffer (128 bytes)
-0980-09BF: Input FCB (64 bytes)
-09C0-09FF: Output FCB (64 bytes)
-```
+Simple linear search with SYMCNT entries. No hash, no flags in current implementation.
 
 ## Key Routines
 

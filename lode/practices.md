@@ -208,4 +208,4 @@ PASS:   DB      1               ; Current pass (1 or 2)
 
 **Exception**: Single-extent files (<16KB) work with just CR reset since extent 0 is already loaded.
 
-See `lode/assembler/stage1-testing.md` Bug 7 for verification against CP/M internals.
+See [stage1-testing.md](assembler/stage1-testing.md) for details on CP/M file handling.
