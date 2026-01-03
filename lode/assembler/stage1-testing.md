@@ -86,6 +86,30 @@ CD xx xx; CALL OUTPUT
 C3 7C 02; JMP HEXLN
 ```
 
+### Bug 4: CD_END doesn't update LNPTR (fixed)
+
+**Symptom**: 0-byte output files when assembling source with label references. Simple hex without labels worked fine.
+
+**Root cause**: The END directive handler (CD_END) set LINBUF[0]=0 to force end-of-file detection, but didn't update LNPTR. After CD_END returned, the PARSE function called HEXLN, which read from LNPTR still pointing into the "END" text. HEXLN tried to parse "ND" as a symbol reference, causing garbage processing.
+
+**Fix**: Set LNPTR to point to the cleared LINBUF so HEXLN sees an empty line:
+
+```
+; CD_END - END directive (old - 8 bytes)
+21 00 00; LXI H,0
+7D; MOV A,L
+32 80 06; STA LINBUF
+C9; RET
+
+; CD_END - END directive (new - 9 bytes)
+21 80 06; LXI H,LINBUF (0680H)
+36 00; MVI M,0
+22 8A 05; SHLD LNPTR  <- Key fix: update pointer
+C9; RET
+```
+
+**Note**: Used `fixaddr.py` to automatically recalculate all 155 affected address references after this 1-byte expansion.
+
 ## Code Size History
 
 | Version | Size | Changes |
@@ -94,6 +118,7 @@ C3 7C 02; JMP HEXLN
 | +GETCHR fix | 1158 bytes | +3 bytes (PUSH H, 2x POP H) |
 | +OUTPUT fix | 1164 bytes | +6 bytes (PUSH H, restructured returns) |
 | +HX_LO/HI fix | 1172 bytes | +8 bytes (separate LOOKUP calls) |
+| +CD_END fix | 1173 bytes | +1 byte (SHLD LNPTR) |
 
 ## Testing Workflow
 

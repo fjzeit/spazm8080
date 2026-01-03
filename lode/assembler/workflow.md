@@ -2,6 +2,19 @@
 
 Source files are version-controlled as text in `src/`, synced to/from the CP/M disk image for development.
 
+## Critical Tool: fixaddr.py
+
+**When modifying hand-assembled `.8hex` files, ALWAYS use `fixaddr.py` after making changes.**
+
+This tool automatically recalculates all addresses when bytes are added or removed. Without it, all jump/call targets after the modification point will be wrong.
+
+```bash
+# After editing stage1.8hex, run:
+python3 scripts/fixaddr.py src/stage1.8hex src/stage1.8hex
+```
+
+See [Tools](#fixaddrpy---address-correction-tool) section for details.
+
 ## Directory Structure
 
 ```
