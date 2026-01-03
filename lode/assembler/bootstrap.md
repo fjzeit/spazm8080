@@ -4,11 +4,12 @@ spazm8080 bootstraps from zero - no external assembler required.
 
 ## Cold Boot Pipeline (PROTECTED)
 
-| File | Format | Assembler | Output | Size |
-|------|--------|-----------|--------|------|
-| `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes |
-| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes |
-| `src/stage2.8hx` | Stage 1 syntax | STAGE1 | STAGE2.COM | 1408 bytes |
+| File | Format | Assembler | Output | Size | Status |
+|------|--------|-----------|--------|------|--------|
+| `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes | FROZEN |
+| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | Complete |
+| `src/stage2.8hx` | Stage 1 | STAGE1 | STAGE2.COM | 1408 bytes | FROZEN |
+| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1620 bytes | Pending |
 
 ### What's FROZEN vs Editable
 
@@ -75,14 +76,21 @@ FORWARD DEVELOPMENT (uses Stage 1 format):
 │  Stage 2: src/stage2.8hx → STAGE2.COM                      │
 │  Format: Stage 1 syntax (labels, symbols)                   │
 │  Capabilities: Same as Stage 1 (labels, ORG, END, </>)      │
-│  Status: COMPLETE + SELF-HOSTING (1408 bytes)               │
-│  Next: Adding DB, DW, DS, EQU directives                    │
+│  Status: COMPLETE + SELF-HOSTING (1408 bytes) [FROZEN]      │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 3+: Full spazm8080                                   │
-│  Format: Stage 2 syntax                                     │
+│  Stage 3: src/stage3.8hx → STAGE3.COM                      │
+│  Format: Stage 2 syntax (same as Stage 1)                   │
+│  New: DB, DW, DS, EQU directives                            │
+│  Status: NOT STARTED                                        │
+└─────────────────────────────────────────────────────────────┘
+                              │ assembles
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 4+: Full spazm8080                                   │
+│  Format: Stage 3 syntax (uses DB, DW, DS, EQU)              │
 │  New: Full 8080 mnemonics, macros, conditionals             │
 │  Goal: Assemble lolos source                                │
 │  Status: NOT STARTED                                        │
@@ -183,17 +191,26 @@ Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
 - Expression arithmetic (+, -)
 - Character literals in hex context ('A')
 
-## Stage 2 Plan
+## Stage 2 Status
 
-Port Stage 1 functionality to Stage 1 format, then extend:
+Stage 1 functionality ported to Stage 1 format:
 
 1. **Verify bootstrap**: Write `stage2.hex` using Stage 1 syntax ✓
 2. **Match output**: `STAGE1 STAGE2` works ✓
 3. **Self-host**: Stage 2 assembles itself ✓
-4. **Add EQU**: `LABEL EQU expr` (pending)
-5. **Add DB**: `DB expr, expr, 'string'` (pending)
-6. **Add DW**: `DW expr, expr` (little-endian) (pending)
-7. **Add DS**: `DS expr` (reserve bytes) (pending)
+
+**Stage 2 is now FROZEN** - it serves as the stable self-hosting baseline.
+
+## Stage 3 Plan
+
+See [../plans/directive-impl.md](../plans/directive-impl.md) for full details.
+
+1. Create stage3.8hx (copy of stage2.8hx)
+2. Add EQU: `LABEL EQU expr`
+3. Add DB: `DB expr, expr, 'string'`
+4. Add DW: `DW expr, expr` (little-endian)
+5. Add DS: `DS expr` (reserve bytes)
+6. Self-host: Stage 3 assembles itself using new features
 
 ## Key Invariants
 

@@ -1,22 +1,36 @@
-# Plan: Adding DB/DW/DS/EQU Directives to Stage 2
+# Plan: Adding DB/DW/DS/EQU Directives via Stage 3
 
 ## Goal
-Add data directives to STAGE2.COM while preserving cold bootstrap.
+
+Add data directives by creating Stage 3. Stage 2 remains frozen as the self-hosting baseline.
+
+## Bootstrap Chain
+
+```
+STAGE1.COM (labels, ORG, END, </>)
+     │
+     └── assembles stage2.8hx (Stage 1 format)
+              │
+              └── STAGE2.COM (same capabilities, self-hosting) [FROZEN]
+                       │
+                       └── assembles stage3.8hx (Stage 2 format)
+                                │
+                                └── STAGE3.COM (adds DB/DW/DS/EQU)
+                                         │
+                                         └── can assemble files USING new directives
+```
 
 ## Cold Bootstrap Constraint
 
-**stage2.8hx must NOT use DB/DW/DS/EQU** - only adds code to handle them.
-STAGE1.COM doesn't understand these directives, so stage2.8hx stays in Stage 1 format.
+**stage3.8hx must NOT use DB/DW/DS/EQU** - it only adds code to handle them.
+STAGE2.COM doesn't understand these directives, so stage3.8hx stays in Stage 2 format.
 
-```
-STAGE1.COM (understands: labels, ORG, END, hex bytes, </>)
-     │
-     └── assembles stage2.8hx (uses only Stage 1 features)
-              │
-              └── produces STAGE2.COM (now understands DB/DW/DS/EQU)
-                       │
-                       └── can assemble files USING DB/DW/DS/EQU
-```
+## Files
+
+| File | Format | Assembled By | Produces |
+|------|--------|--------------|----------|
+| `src/stage2.8hx` | Stage 1 | STAGE1.COM | STAGE2.COM (1408 bytes) - **FROZEN** |
+| `src/stage3.8hx` | Stage 2 | STAGE2.COM | STAGE3.COM (~1620 bytes) |
 
 ## Implementation Order
 
@@ -90,13 +104,13 @@ call EXPR → count in HL
 
 ## Memory Impact
 
-Current code ends around 0x580 (1408 bytes). Adding directives:
+Stage 2 code ends around 0x580 (1408 bytes). Adding directives:
 - EQU: ~50 bytes
 - DB: ~100 bytes (string parsing is complex)
 - DW: ~30 bytes
 - DS: ~30 bytes
 
-Estimated new size: ~1620 bytes (still fits before TOKBUF at 0x620)
+Estimated Stage 3 size: ~1620 bytes (still fits before TOKBUF at 0x620)
 
 ## Testing Strategy
 
@@ -129,11 +143,11 @@ Expected: `34 12`
 ### Test 4: DS
 ```
         ORG 0100H
-START:  C3 END
+START:  C3 ENDLBL
         DS 5
-END:    C9
+ENDLBL: C9
 ```
-Expected: `C3 08 01 00 00 00 00 00 C9` (START=0100, END=0108)
+Expected: `C3 08 01 00 00 00 00 00 C9` (START=0100, ENDLBL=0108)
 
 ## Implementation Notes
 
@@ -149,14 +163,17 @@ Unlike other directives, it's detected during label scanning, not CHKDIR.
 Approach: In CHKLBL, if no colon found, check if next token is "EQU".
 If yes, parse value and call DEFSYM with the name.
 
-## Files to Modify
+## Creating stage3.8hx
 
-- `src/stage2.8hx`: Add directive handling code
-- Test after each directive to ensure self-hosting still works
+1. Copy stage2.8hx to stage3.8hx
+2. Add directive handling code
+3. Assemble with STAGE2: `STAGE2 STAGE3`
+4. Test each new directive with simple test files
+5. Eventually: Stage 3 self-hosts using its own new features
 
 ## Verification
 
 After each change:
-1. `STAGE1 STAGE2` → new STAGE2.COM
-2. `STAGE2 STAGE2` → should produce identical binary
-3. Test new directive with simple file
+1. `STAGE2 STAGE3` → new STAGE3.COM
+2. Test new directive with simple file
+3. Once all directives work: `STAGE3 STAGE3` → verify self-hosting

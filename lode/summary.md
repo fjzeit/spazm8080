@@ -8,11 +8,12 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ### Cold Boot Pipeline (PROTECTED)
 
-| File | Format | Assembler | Output | Size |
-|------|--------|-----------|--------|------|
-| `src/stage0.8hx` | Raw hex only | Hand/xxd | SPAZM0.COM | 432 bytes |
-| `src/stage1.8hx` | Raw hex + comments | SPAZM0 | STAGE1.COM | 1296 bytes |
-| `src/stage2.8hx` | Labels + directives | STAGE1 | STAGE2.COM | 1408 bytes |
+| File | Format | Assembler | Output | Size | Status |
+|------|--------|-----------|--------|------|--------|
+| `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes | FROZEN |
+| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | Complete |
+| `src/stage2.8hx` | Stage 1 | STAGE1 | STAGE2.COM | 1408 bytes | FROZEN |
+| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1620 bytes | Pending |
 
 *stage1.8hx can be modified but **must remain in Stage 0 format** (raw hex bytes). Use `fixaddr.py` after edits.
 
@@ -35,14 +36,15 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 ### Next Steps
 
 See [plans/directive-impl.md](plans/directive-impl.md) for implementation plan:
-1. Add EQU directive (simplest, no output)
-2. Add DB directive (strings and bytes)
-3. Add DW directive (16-bit words)
-4. Add DS directive (reserve space)
+1. Create stage3.8hx (copy of stage2.8hx)
+2. Add EQU directive (simplest, no output)
+3. Add DB directive (strings and bytes)
+4. Add DW directive (16-bit words)
+5. Add DS directive (reserve space)
 
 ### Resume Prompt
 
-"Continue spazm8080 development. Stage 2 is self-hosting. Next: add EQU directive to stage2 following plans/directive-impl.md."
+"Continue spazm8080 development. Stage 2 is self-hosting and frozen. Next: create stage3.8hx and add EQU directive following plans/directive-impl.md."
 
 ## Goals
 
