@@ -2,7 +2,7 @@
 """
 fixaddr.py - Fix stale addresses in hand-assembled hex files
 
-This tool corrects address references in stage1.8hex files where bytes have
+This tool corrects address references in .8hx files where bytes have
 been added or removed, causing addresses to shift. It:
 
 1. Parses hex bytes to calculate actual addresses
@@ -10,7 +10,7 @@ been added or removed, causing addresses to shift. It:
 3. Updates jump/call target addresses to match actual label positions
 4. Updates label declaration comments to show correct addresses
 
-Usage: python3 fixaddr.py [input.8hex] [output.8hex] [--base XXXX]
+Usage: python3 fixaddr.py [input.8hx] [output.8hx] [--base XXXX]
        Default base address is 0100 (CP/M .COM file)
 """
 
@@ -357,10 +357,10 @@ def main():
     parser = argparse.ArgumentParser(
         description='Fix stale addresses in hand-assembled hex files'
     )
-    parser.add_argument('input', nargs='?', default='src/stage1.8hex',
-                        help='Input hex file (default: src/stage1.8hex)')
+    parser.add_argument('input', nargs='?', default='src/stage1.8hx',
+                        help='Input hex file (default: src/stage1.8hx)')
     parser.add_argument('output', nargs='?',
-                        help='Output hex file (default: input with .fixed.8hex)')
+                        help='Output hex file (default: input with .fixed.8hx)')
     parser.add_argument('--base', type=lambda x: int(x, 16), default=0x0100,
                         help='Base address in hex (default: 0100)')
     parser.add_argument('--show-labels', action='store_true',
@@ -371,7 +371,7 @@ def main():
     args = parser.parse_args()
 
     if args.output is None:
-        args.output = args.input.replace('.8hex', '.fixed.8hex')
+        args.output = args.input.replace('.8hx', '.fixed.8hx')
 
     fixer = AddressFixer(base_addr=args.base)
 

@@ -78,12 +78,21 @@
 - **DMA** - Data Memory Address (default 0080H)
 - **COM file** - CP/M executable (loads at 0100H)
 
+## Source Formats
+
+- **.8hx** - Extended hex format: raw hex bytes with comments, labels, directives
+- **Stage 0 format** - Pure hex bytes, comments only (no labels)
+- **Stage 1 format** - Hex bytes with labels (`LABEL:`), ORG, END, symbol references
+- **Stage 2 format** - Hex opcodes with DB, DW, DS, EQU, expressions (planned)
+- **Stage 3 format** - Full mnemonic assembler syntax (JMP, CALL, MOV, etc.)
+
 ## Output Formats
 
 - **Intel HEX** - ASCII hex records with checksums
 - **CMD** - TRS-80 DOS executable format
 - **CIM** - Core-in-memory raw binary
 - **REL** - Relocatable object module
+- **COM** - CP/M executable (raw binary, loads at 0100H)
 
 ## Assembly Process
 

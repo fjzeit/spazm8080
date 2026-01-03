@@ -10,7 +10,7 @@
 - [assembler/bootstrap.md](assembler/bootstrap.md) - **Cold boot pipeline (PROTECTED)** and stage progression
 - [assembler/stage1-design.md](assembler/stage1-design.md) - Stage 1 extended hex format with labels
 - [assembler/stage1-testing.md](assembler/stage1-testing.md) - Stage 1 test results and bug fixes
-- [assembler/workflow.md](assembler/workflow.md) - Development workflow, cpmtools, **fixaddr.py** (critical for .8hex edits)
+- [assembler/workflow.md](assembler/workflow.md) - Development workflow, cpmtools, **fixaddr.py** (critical for .8hx edits)
 - [assembler/stage0-newline-bug.md](assembler/stage0-newline-bug.md) - ~~RESOLVED~~ CPI carry flag bug and fix
 
 ## Plans

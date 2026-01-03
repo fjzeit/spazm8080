@@ -147,7 +147,7 @@ All 89 labels now show `Declared == Actual` (delta 0). The tool is idempotent - 
 |------|--------|
 | `scripts/fixaddr.py` | New tool (367 lines) |
 | `src/stage1.hex` | All addresses corrected |
-| `src/stage1.8hex` | Stage 1 source (renamed from .hex) |
+| `src/stage1.8hx` | Stage 1 source (renamed from .hex) |
 | `lode/assembler/workflow.md` | Tool documentation added |
 | `lode/summary.md` | Status updated |
 
@@ -155,13 +155,13 @@ All 89 labels now show `Declared == Actual` (delta 0). The tool is idempotent - 
 
 ```bash
 # Dry-run to see changes without modifying
-python3 scripts/fixaddr.py src/stage1.8hex --dry-run
+python3 scripts/fixaddr.py src/stage1.8hx --dry-run
 
 # Apply fixes to new file
-python3 scripts/fixaddr.py src/stage1.8hex src/stage1.fixed.8hex
+python3 scripts/fixaddr.py src/stage1.8hx src/stage1.fixed.8hx
 
 # Show label table only
-python3 scripts/fixaddr.py src/stage1.8hex --show-labels
+python3 scripts/fixaddr.py src/stage1.8hx --show-labels
 ```
 
 ---
@@ -174,8 +174,8 @@ Stage 1 addresses are now correct. To continue:
 
 1. **Assemble Stage 1**:
    ```
-   # Sync stage1.8hex to disk
-   cpmcp -f ibm-3740 work.dsk src/stage1.8hex 0:STAGE1.HEX
+   # Sync stage1.8hx to disk
+   cpmcp -f ibm-3740 work.dsk src/stage1.8hx 0:STAGE1.HEX
 
    # Boot CP/M and run SPAZM0
    SPAZM0 STAGE1
@@ -183,9 +183,9 @@ Stage 1 addresses are now correct. To continue:
 
 2. **Test the resulting STAGE1.COM** on a simple test file to verify it works.
 
-3. **If you modify stage1.8hex** (add/remove bytes), run `fixaddr.py` again before assembling:
+3. **If you modify stage1.8hx** (add/remove bytes), run `fixaddr.py` again before assembling:
    ```bash
-   python3 scripts/fixaddr.py src/stage1.8hex src/stage1.8hex
+   python3 scripts/fixaddr.py src/stage1.8hx src/stage1.8hx
    ```
 
 ### Key Points for Future Edits

@@ -110,6 +110,55 @@ C9; RET
 
 **Note**: Used `fixaddr.py` to automatically recalculate all 155 affected address references after this 1-byte expansion.
 
+### Bug 5: Token-length parsing needed (fixed)
+
+**Symptom**: Needed cleaner way to distinguish hex bytes from label references without `:` prefix.
+
+**Solution**: Rewrote HEXLN with token-scanning approach:
+- 2 hex chars = byte (e.g., `C3` → 0xC3)
+- 4 hex chars = word, little-endian (e.g., `0100` → 0x00, 0x01)
+- Otherwise = label reference (e.g., `LOOP` → address lookup)
+
+The scanner counts token length and checks if all chars are hex digits. This is simpler than requiring a `:` prefix for labels.
+
+### Bug 6: Code/variable address overlap (fixed)
+
+**Symptom**: 0-byte output, corrupted behavior. Variables at 0x0580 were overwritten by code.
+
+**Root cause**: Code grew to 1268 bytes (ends at 0x05F4) but variables were at 0x0580-0x058F. Code was overwriting its own variables!
+
+**Fix**: Relocated all variables from 058x to 06Fx:
+- PASS: 06F0
+- ICNT: 06F1
+- IPTR: 06F2 (2 bytes)
+- OCNT: 06F4
+- OPTR: 06F5 (2 bytes)
+- SYMCNT: 06F7
+- LOCTR: 06F8 (2 bytes)
+- LNPTR: 06FA (2 bytes)
+
+Used sed to bulk-replace addresses, then `fixaddr.py` for jump targets.
+
+### Bug 7: File not rewound for pass 2 (fixed)
+
+**Symptom**: "Undef" error on valid symbols. Pass 2 read from middle of file instead of start.
+
+**Root cause**: In CP/M 2.2, simply resetting FCB+12 (extent) and FCB+32 (CR) to 0 doesn't reload extent 0's allocation block pointers. The FCB still has allocation info from the last extent accessed in pass 1.
+
+**Fix**: Re-open the file at P1END to reload extent 0 information:
+```
+AF; XRA A
+32 7C 00; STA FCB+32 (reset CR)
+32 68 00; STA FCB+12 (reset extent)
+11 5C 00; LXI D,FCB
+0E 0F; MVI C,15 (open file)
+CD 05 00; CALL BDOS
+AF; XRA A
+32 F1 06; STA ICNT
+```
+
+This is standard CP/M behavior - Open loads the FCB with extent 0's disk allocation blocks.
+
 ## Code Size History
 
 | Version | Size | Changes |
@@ -119,6 +168,9 @@ C9; RET
 | +OUTPUT fix | 1164 bytes | +6 bytes (PUSH H, restructured returns) |
 | +HX_LO/HI fix | 1172 bytes | +8 bytes (separate LOOKUP calls) |
 | +CD_END fix | 1173 bytes | +1 byte (SHLD LNPTR) |
+| +Token-length HEXLN | 1268 bytes | Rewrote hex parsing |
+| +Variable relocation | 1268 bytes | 058x → 06Fx (code/data overlap fix) |
+| +File rewind fix | 1280 bytes | +12 bytes (re-open + extent reset) |
 
 ## Testing Workflow
 
@@ -126,11 +178,11 @@ C9; RET
    ```bash
    cp path/to/lolos.dsk work.dsk
 
-   # Generate SPAZM0.COM from stage0.8hex (cold boot method):
-   sed 's/;.*//' src/stage0.8hex | xxd -r -p > /tmp/spazm0.com
+   # Generate SPAZM0.COM from stage0.8hx (cold boot method):
+   sed 's/;.*//' src/stage0.8hx | xxd -r -p > /tmp/spazm0.com
    cpmcp -f ibm-3740 work.dsk /tmp/spazm0.com 0:SPAZM0.COM
 
-   cpmcp -f ibm-3740 work.dsk src/stage1.8hex 0:STAGE1.HEX
+   cpmcp -f ibm-3740 work.dsk src/stage1.8hx 0:STAGE1.HEX
    ```
 
 2. Mount and build in emulator:
@@ -161,4 +213,13 @@ C9; RET
 
 ## Resume Prompt
 
-"Continue spazm8080 Stage 2 development. Stage 1 is complete (1173 bytes, 4 bugs fixed). stage2.8hex exists and is ready to assemble. Next: assemble stage2.8hex, verify it works, then add DB/DW/DS/EQU."
+"Continue spazm8080 development. Stage 1 is complete (1280 bytes, 7 bugs fixed). STAGE1.COM successfully assembled stage2.8hx producing 1280 bytes. Next steps: (1) Update stage2.8hx with current stage1 fixes for full circular bootstrap, (2) Add DB/DW/DS/EQU support."
+
+## Milestone Achieved: 2026-01-03
+
+**Stage 1 successfully assembles label-based source files.**
+
+- Token-length parsing works: 2 chars=byte, 4 chars=word, else=label
+- Forward references resolve correctly across two passes
+- CP/M file rewind properly implemented (re-open to reload extent 0)
+- STAGE1.COM (1280 bytes) assembled stage2.8hx → STAGE2.COM (1280 bytes)

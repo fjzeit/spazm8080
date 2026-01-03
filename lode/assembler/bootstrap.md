@@ -6,20 +6,20 @@ spazm8080 bootstraps from zero - no external assembler required.
 
 | File | Format | Assembler | Output | Size | Status |
 |------|--------|-----------|--------|------|--------|
-| `src/stage0.8hex` | Raw hex | Hand/xxd | `stage0.com` | 432 bytes | **FROZEN** |
-| `src/stage1.8hex` | Raw hex | Stage 0 | `stage1.com` | 1173 bytes | Editable* |
+| `src/stage0.8hx` | Raw hex | Hand/xxd | `stage0.com` | 432 bytes | **FROZEN** |
+| `src/stage1.8hx` | Raw hex | Stage 0 | `stage1.com` | 1173 bytes | Editable* |
 
 ### What's FROZEN vs Editable
 
-- **stage0.8hex is FROZEN**: Cannot use any assembler features - just raw hex. Never modify.
-- **stage1.8hex is EDITABLE**: Can be modified, but **must remain in Stage 0 format** (raw hex bytes + comments). After edits, run `python3 scripts/fixaddr.py` to recalculate addresses.
+- **stage0.8hx is FROZEN**: Cannot use any assembler features - just raw hex. Never modify.
+- **stage1.8hx is EDITABLE**: Can be modified, but **must remain in Stage 0 format** (raw hex bytes + comments). After edits, run `python3 scripts/fixaddr.py` to recalculate addresses.
 
 ### Why Stage 0 Format Matters
 
 - Stage 0 only understands: hex byte pairs + `;` comments
-- stage1.8hex uses hardcoded addresses like `CA C5 03` (JZ 03C5H)
+- stage1.8hx uses hardcoded addresses like `CA C5 03` (JZ 03C5H)
 - If we add label references, Stage 0 can't assemble it → cold boot breaks
-- stage0.8hex is the true "seed" - everything else grows from it
+- stage0.8hx is the true "seed" - everything else grows from it
 
 ### Cold Boot Procedure
 
@@ -29,12 +29,12 @@ spazm8080 bootstraps from zero - no external assembler required.
 # 1. Create fresh disk from lolos base
 cp path/to/lolos.dsk work.dsk
 
-# 2. Convert stage0.8hex to binary (strip comments, then hex-to-binary)
-sed 's/;.*//' src/stage0.8hex | xxd -r -p > /tmp/spazm0.com
+# 2. Convert stage0.8hx to binary (strip comments, then hex-to-binary)
+sed 's/;.*//' src/stage0.8hx | xxd -r -p > /tmp/spazm0.com
 
 # 3. Copy Stage 0 and Stage 1 source to disk
 cpmcp -f ibm-3740 work.dsk /tmp/spazm0.com 0:SPAZM0.COM
-cpmcp -f ibm-3740 work.dsk src/stage1.8hex 0:STAGE1.HEX
+cpmcp -f ibm-3740 work.dsk src/stage1.8hx 0:STAGE1.HEX
 
 # 4. Boot CP/M and assemble Stage 1
 A>SPAZM0 STAGE1                          # Produces STAGE1.COM
@@ -50,7 +50,7 @@ A>STAGE1 STAGE2                          # Produces STAGE2.COM
 ```
 COLD BOOT (frozen, raw hex):
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 0: src/stage0.8hex → SPAZM0.COM                      │
+│  Stage 0: src/stage0.8hx → SPAZM0.COM                      │
 │  Format: Raw hex bytes only                                  │
 │  Capabilities: Hex pairs + semicolon comments               │
 │  Status: COMPLETE (432 bytes)                               │
@@ -58,7 +58,7 @@ COLD BOOT (frozen, raw hex):
                               │ assembles
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 1: src/stage1.8hex → STAGE1.COM                      │
+│  Stage 1: src/stage1.8hx → STAGE1.COM                      │
 │  Format: Raw hex bytes only (Stage 0 input)                 │
 │  Capabilities: Labels, ORG, END, symbol refs, </>           │
 │  Status: COMPLETE (1173 bytes, 4 bugs fixed)                │
@@ -67,7 +67,7 @@ COLD BOOT (frozen, raw hex):
                               ▼
 FORWARD DEVELOPMENT (uses Stage 1 format):
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 2: src/stage2.8hex → STAGE2.COM                      │
+│  Stage 2: src/stage2.8hx → STAGE2.COM                      │
 │  Format: Stage 1 syntax (labels, symbols)                   │
 │  New: DB, DW, DS, EQU directives                            │
 │  Goal: Self-hosting (can reassemble itself)                 │
@@ -192,12 +192,12 @@ Port Stage 1 functionality to Stage 1 format, then extend:
 
 ## Key Invariants
 
-1. **stage0.8hex is immutable** - The true seed file; never modify
-2. **stage1.8hex must stay in Stage 0 format** - Editable, but only raw hex bytes
+1. **stage0.8hx is immutable** - The true seed file; never modify
+2. **stage1.8hx must stay in Stage 0 format** - Editable, but only raw hex bytes
 3. **Each stage assembles the next** - Stage N produces Stage N+1
 4. **Forward compatibility** - Higher stages accept lower stage formats
 5. **Self-hosting goal** - Final stage reassembles itself identically
-6. **Use fixaddr.py after editing stage1.8hex** - Recalculates all addresses automatically
+6. **Use fixaddr.py after editing stage1.8hx** - Recalculates all addresses automatically
 
 ## Related
 

@@ -303,10 +303,10 @@ CDORG:
 
 ; CD_END - END directive
 CDEND:
-; Set line to null to force EOF
-        21 00 00        ; LXI H,0
-        7D              ; MOV A,L
-        32 80 06        ; STA LINBUF
+; Set line to null AND update LNPTR so HEXLN sees empty
+        21 80 06        ; LXI H,LINBUF (0680H)
+        36 00           ; MVI M,0
+        22 8A 05        ; SHLD LNPTR
         C9              ; RET
 
 ; ============================================================
@@ -327,12 +327,22 @@ HEXLN:
 ; Check for > (high byte)
         FE 3E           ; CPI '>'
         CA HXHI         ; JZ HX_HI
+; Check for : (explicit symbol reference)
+        FE 3A           ; CPI ':'
+        CA HXCOL        ; JZ HX_COLON - skip : and parse symbol
 
 ; Check if hex digit
         CD ISHEX        ; CALL ISHEX
         DA HXSYM        ; JC HX_SYM (not hex, try symbol)
 
-; Parse hex byte
+; Parse hex byte - first check second char is also hex
+        23              ; INX H (peek at second char)
+        7E              ; MOV A,M
+        CD ISHEXA       ; CALL ISHEX_A
+        2B              ; DCX H (back to first char)
+        DA HXSYM        ; JC HX_SYM - if second not hex, treat as symbol
+; Both chars are hex, parse as byte
+        7E              ; MOV A,M (reload first char)
         CD HEXVAL       ; CALL HEXVAL
         07              ; RLC
         07              ; RLC
@@ -367,6 +377,13 @@ HXHI:
         7C              ; MOV A,H
         CD OUTPUT       ; CALL OUTPUT
         C3 HEXLN        ; JMP HEXLN
+
+; HX_COLON - Explicit symbol reference (SYMBOL)
+; Skip the colon and fall through to HX_SYM
+HXCOL:
+        23              ; INX H (skip colon)
+        22 8A 05        ; SHLD LNPTR
+; Fall through to HX_SYM
 
 ; HX_SYM - Symbol reference, output low then high
 HXSYM:
@@ -436,6 +453,11 @@ GCEOF:
 ISHEX:
         2A 8A 05        ; LHLD LNPTR
         7E              ; MOV A,M
+; Fall through to ISHEX_A
+
+; ISHEX_A - Check if char in A is hex (for second char validation)
+; Returns: CY=1 if not hex, A may be modified (uppercased)
+ISHEXA:
 ; Convert to uppercase
         FE 61           ; CPI 'a'
         DA IH1          ; JC IH1
@@ -551,20 +573,20 @@ WRSEC:
 ; ============================================================
 NOFILE:
         11 MNOF         ; LXI D,MNOF
-        C3 ERROR        ; JMP ERROR
+        C3 XERROR       ; JMP XERROR
 
 ; DSKFUL error
 DSKFUL:
         11 MDSK         ; LXI D,MDSK
-        C3 ERROR        ; JMP ERROR
+        C3 XERROR       ; JMP XERROR
 
 ; UNDEF error
 UNDEF:
         11 MUDF         ; LXI D,MUDF
-; Fall through to ERROR
+; Fall through to XERROR
 
-; ERROR
-ERROR:
+; XERROR - renamed from ERROR (E is a hex digit!)
+XERROR:
         0E 09           ; MVI C,9
         CD 05 00        ; CALL BDOS
         C3 00 00        ; JMP BOOT
@@ -588,13 +610,13 @@ DEFSYM:
 ; Symbol table at 0840, 8 bytes per entry (6 name + 2 value)
         E5              ; PUSH H (label start)
         3A 87 05        ; LDA SYMCNT
-; Calculate slot: SYMTAB + SYMCNT * 8
-        87              ; ADD A
-        87              ; ADD A
-        87              ; ADD A (x8)
-        5F              ; MOV E,A
-        16 00           ; MVI D,0
-        21 40 08        ; LXI H,SYMTAB
+; Calculate slot: SYMTAB + SYMCNT * 8 (16-bit to handle >32 symbols)
+        6F              ; MOV L,A
+        26 00           ; MVI H,0
+        29              ; DAD H (x2)
+        29              ; DAD H (x4)
+        29              ; DAD H (x8)
+        11 40 08        ; LXI D,SYMTAB
         19              ; DAD D
         EB              ; XCHG (DE = slot address)
         E1              ; POP H (label start)
