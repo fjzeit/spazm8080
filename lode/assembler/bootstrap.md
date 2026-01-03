@@ -7,7 +7,7 @@ spazm8080 bootstraps from zero - no external assembler required.
 | File | Format | Assembler | Output | Size | Status |
 |------|--------|-----------|--------|------|--------|
 | `src/stage0.8hx` | Raw hex | Hand/xxd | `stage0.com` | 432 bytes | **FROZEN** |
-| `src/stage1.8hx` | Raw hex | Stage 0 | `stage1.com` | 1173 bytes | Editable* |
+| `src/stage1.8hx` | Raw hex | Stage 0 | `stage1.com` | 1280 bytes | Editable* |
 
 ### What's FROZEN vs Editable
 
@@ -61,7 +61,7 @@ COLD BOOT (frozen, raw hex):
 │  Stage 1: src/stage1.8hx → STAGE1.COM                      │
 │  Format: Raw hex bytes only (Stage 0 input)                 │
 │  Capabilities: Labels, ORG, END, symbol refs, </>           │
-│  Status: COMPLETE (1173 bytes, 4 bugs fixed)                │
+│  Status: COMPLETE (1280 bytes, 7 bugs fixed)                │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
@@ -160,12 +160,12 @@ Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
 - Hex numbers: `0FFH`, `$FF`, decimal: `255`
 - Two-pass: forward references resolved
 
-### Memory Map (1173 bytes)
+### Memory Map (1280 bytes)
 ```
-0100-057F: Code
-0580-058F: Variables (PASS, ICNT, IPTR, OCNT, OPTR, SYMCNT, LOCTR, LNPTR)
+0100-05FF: Code (ends ~0x0600)
 0600-067F: Token buffer
-0680-06FF: Line buffer
+0680-06EF: Line buffer
+06F0-06FB: Variables (PASS, ICNT, IPTR, OCNT, OPTR, SYMCNT, LOCTR, LNPTR)
 0700-077F: Input buffer
 0780-07FF: Output buffer
 0800-083F: Output FCB
