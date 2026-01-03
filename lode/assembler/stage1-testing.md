@@ -124,8 +124,12 @@ C9; RET
 
 1. Prepare fresh disk:
    ```bash
-   cp lolos/drivea.dsk work.dsk
-   cpmcp -f ibm-3740 work.dsk src/stage0.com 0:SPAZM0.COM
+   cp path/to/lolos.dsk work.dsk
+
+   # Generate SPAZM0.COM from stage0.8hex (cold boot method):
+   sed 's/;.*//' src/stage0.8hex | xxd -r -p > /tmp/spazm0.com
+   cpmcp -f ibm-3740 work.dsk /tmp/spazm0.com 0:SPAZM0.COM
+
    cpmcp -f ibm-3740 work.dsk src/stage1.8hex 0:STAGE1.HEX
    ```
 

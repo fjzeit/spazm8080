@@ -25,14 +25,25 @@ spazm8080 bootstraps from zero - no external assembler required.
 
 ```bash
 # From absolute zero (no binaries exist):
-xxd -r -p stage0.8hex > stage0.com      # Or hand-assemble
-cpmcp -f ibm-3740 work.dsk stage0.com 0:SPAZM0.COM
 
-# Boot CP/M, then:
+# 1. Create fresh disk from lolos base
+cp path/to/lolos.dsk work.dsk
+
+# 2. Convert stage0.8hex to binary (strip comments, then hex-to-binary)
+sed 's/;.*//' src/stage0.8hex | xxd -r -p > /tmp/spazm0.com
+
+# 3. Copy Stage 0 and Stage 1 source to disk
+cpmcp -f ibm-3740 work.dsk /tmp/spazm0.com 0:SPAZM0.COM
+cpmcp -f ibm-3740 work.dsk src/stage1.8hex 0:STAGE1.HEX
+
+# 4. Boot CP/M and assemble Stage 1
 A>SPAZM0 STAGE1                          # Produces STAGE1.COM
 
-# Now Stage 1 exists and can assemble Stage 2+
+# 5. Now Stage 1 exists and can assemble Stage 2+
+A>STAGE1 STAGE2                          # Produces STAGE2.COM
 ```
+
+**Note**: The `sed 's/;.*//'` strips comments before `xxd -r -p` converts hex to binary.
 
 ## Bootstrap Stages
 
