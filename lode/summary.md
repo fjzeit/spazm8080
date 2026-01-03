@@ -8,14 +8,13 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ### Cold Boot Pipeline (PROTECTED)
 
-These files are **frozen** - they enable bootstrapping from nothing:
+| File | Format | Assembler | Output | Status |
+|------|--------|-----------|--------|--------|
+| `src/stage0.8hex` | Raw hex only | Hand/trivial | SPAZM0.COM (432 bytes) | FROZEN |
+| `src/stage1.8hex` | Raw hex + comments | SPAZM0 | STAGE1.COM (1173 bytes) | Editable* |
+| `src/stage2.8hex` | Labels + directives | STAGE1 | STAGE2.COM | In progress |
 
-| File | Format | Output | Status |
-|------|--------|--------|--------|
-| `src/stage0.8hex` | Raw hex | SPAZM0.COM (432 bytes) | FROZEN ✓ |
-| `src/stage1.8hex` | Raw hex | STAGE1.COM (1172 bytes) | FROZEN ✓ |
-
-**Never modify these files** - they use hardcoded addresses that Stage 0 can process.
+*stage1.8hex can be modified but **must remain in Stage 0 format** (raw hex bytes). Use `fixaddr.py` after edits.
 
 ### Stage 0 Complete ✓
 
@@ -23,21 +22,28 @@ SPAZM0.COM (432 bytes) - hex-to-COM converter. Reads raw hex bytes, writes `.COM
 
 ### Stage 1 Complete ✓
 
-STAGE1.COM (1172 bytes) - two-pass assembler with:
+STAGE1.COM (1173 bytes) - two-pass assembler with:
 - Labels (`LABEL:`)
 - ORG, END directives
 - Symbol references in hex (`C3 LABEL`)
 - Low/high byte operators (`<LABEL`, `>LABEL`)
 
+**Known bugs fixed**: GETCHR/OUTPUT register preservation, HX_LO/HX_HI double output, CD_END LNPTR update. See `lode/assembler/stage1-testing.md`.
+
 **Not yet implemented**: EQU, DB, DW, DS, expression arithmetic
 
+### Stage 2 In Progress
+
+`src/stage2.8hex` exists - Stage 1 logic rewritten in Stage 1 format (with labels instead of hardcoded addresses). Ready to test assembly.
+
 ### Next Steps
-1. Create `stage2.hex` in Stage 1 format (labels, not hardcoded addresses)
-2. Add DB, DW, DS, EQU directives to Stage 2
-3. Achieve self-hosting: Stage 2 assembles itself
+1. Assemble stage2.8hex with Stage 1 → STAGE2.COM
+2. Verify STAGE2.COM works identically to STAGE1.COM
+3. Add DB, DW, DS, EQU directives to Stage 2
+4. Achieve self-hosting: Stage 2 assembles itself
 
 ### Resume Prompt
-"Continue spazm8080 development. Stage 1 is fully tested. Next: add Db, DW, DS directives or attempt self-assembly."
+"Continue spazm8080 Stage 2 development. Stage 1 is complete and tested (1173 bytes). stage2.8hex exists - need to assemble and verify it works. Then add DB/DW/DS/EQU directives."
 
 ## Goals
 
@@ -89,12 +95,12 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | File | Purpose |
 |------|---------|
 | `lode/assembler/architecture.md` | Two-pass design, data structures, module APIs |
-| `lode/assembler/bootstrap.md` | Stage 0-3 bootstrap strategy |
-| `lode/assembler/workflow.md` | cpmtools sync workflow, fixaddr.py docs |
+| `lode/assembler/bootstrap.md` | Stage 0-3 bootstrap strategy, cold boot protection |
+| `lode/assembler/workflow.md` | cpmtools sync, **fixaddr.py** (critical for .8hex edits) |
+| `lode/assembler/stage1-testing.md` | Bug fixes and test results |
 | `lode/terminology.md` | 8080/Z80/CP/M vocabulary |
 | `lode/practices.md` | Assembly coding patterns |
-| `scripts/fixaddr.py` | Address correction for hand-assembled hex |
-| `src/stage0.asm` | Stage 0 documented source |
-| `src/stage0.8hex` | Stage 0 hand-assembled bytes |
-| `src/stage0.com` | Stage 0 binary (430 bytes) |
-| `src/stage1.8hex` | Stage 1 hand-assembled source (1172 bytes) |
+| `scripts/fixaddr.py` | **Critical**: Address correction after .8hex edits |
+| `src/stage0.8hex` | Stage 0 source - FROZEN |
+| `src/stage1.8hex` | Stage 1 source (1173 bytes) - raw hex format |
+| `src/stage2.8hex` | Stage 2 source - Stage 1 format with labels |

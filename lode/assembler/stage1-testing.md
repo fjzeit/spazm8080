@@ -157,4 +157,4 @@ C9; RET
 
 ## Resume Prompt
 
-"Continue spazm8080 development. Stage 1 is fully tested and working. All core features verified: hex output, labels, symbol references, </>  operators, ORG directive, forward references. Next: add DB, DW, DS directives or test self-assembly."
+"Continue spazm8080 Stage 2 development. Stage 1 is complete (1173 bytes, 4 bugs fixed). stage2.8hex exists and is ready to assemble. Next: assemble stage2.8hex, verify it works, then add DB/DW/DS/EQU."

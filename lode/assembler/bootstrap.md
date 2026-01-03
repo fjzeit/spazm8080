@@ -4,19 +4,22 @@ spazm8080 bootstraps from zero - no external assembler required.
 
 ## Cold Boot Pipeline (PROTECTED)
 
-These files enable bootstrapping from nothing. **NEVER MODIFY** - they use raw hex with hardcoded addresses that Stage 0 can process.
+| File | Format | Assembler | Output | Size | Status |
+|------|--------|-----------|--------|------|--------|
+| `src/stage0.8hex` | Raw hex | Hand/xxd | `stage0.com` | 432 bytes | **FROZEN** |
+| `src/stage1.8hex` | Raw hex | Stage 0 | `stage1.com` | 1173 bytes | Editable* |
 
-| File | Format | Assembler | Output | Size |
-|------|--------|-----------|--------|------|
-| `src/stage0.8hex` | Raw hex | Hand/xxd | `stage0.com` | 432 bytes |
-| `src/stage1.8hex` | Raw hex | Stage 0 | `stage1.com` | 1172 bytes |
+### What's FROZEN vs Editable
 
-### Why These Are Frozen
+- **stage0.8hex is FROZEN**: Cannot use any assembler features - just raw hex. Never modify.
+- **stage1.8hex is EDITABLE**: Can be modified, but **must remain in Stage 0 format** (raw hex bytes + comments). After edits, run `python3 scripts/fixaddr.py` to recalculate addresses.
 
-- **Stage 0 format**: Raw hex bytes + `;` comments only. No labels, no directives.
-- **Stage 1.8hex** uses hardcoded addresses like `CA C4 03` (JMP 03C4H)
+### Why Stage 0 Format Matters
+
+- Stage 0 only understands: hex byte pairs + `;` comments
+- stage1.8hex uses hardcoded addresses like `CA C5 03` (JZ 03C5H)
 - If we add label references, Stage 0 can't assemble it → cold boot breaks
-- These files are the "seed" - everything else grows from them
+- stage0.8hex is the true "seed" - everything else grows from it
 
 ### Cold Boot Procedure
 
@@ -47,17 +50,17 @@ COLD BOOT (frozen, raw hex):
 │  Stage 1: src/stage1.8hex → STAGE1.COM                      │
 │  Format: Raw hex bytes only (Stage 0 input)                 │
 │  Capabilities: Labels, ORG, END, symbol refs, </>           │
-│  Status: COMPLETE (1172 bytes)                              │
+│  Status: COMPLETE (1173 bytes, 4 bugs fixed)                │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
 FORWARD DEVELOPMENT (uses Stage 1 format):
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 2: src/stage2.hex → STAGE2.COM                       │
+│  Stage 2: src/stage2.8hex → STAGE2.COM                      │
 │  Format: Stage 1 syntax (labels, symbols)                   │
 │  New: DB, DW, DS, EQU directives                            │
 │  Goal: Self-hosting (can reassemble itself)                 │
-│  Status: NOT STARTED                                        │
+│  Status: IN PROGRESS (source exists, ready to assemble)     │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
@@ -146,7 +149,7 @@ Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
 - Hex numbers: `0FFH`, `$FF`, decimal: `255`
 - Two-pass: forward references resolved
 
-### Memory Map (1172 bytes)
+### Memory Map (1173 bytes)
 ```
 0100-057F: Code
 0580-058F: Variables (PASS, ICNT, IPTR, OCNT, OPTR, SYMCNT, LOCTR, LNPTR)
@@ -178,10 +181,12 @@ Port Stage 1 functionality to Stage 1 format, then extend:
 
 ## Key Invariants
 
-1. **Cold boot files are immutable** - `stage0.8hex` and `stage1.8hex` never change
-2. **Each stage assembles the next** - Stage N produces Stage N+1
-3. **Forward compatibility** - Higher stages accept lower stage formats
-4. **Self-hosting goal** - Final stage reassembles itself identically
+1. **stage0.8hex is immutable** - The true seed file; never modify
+2. **stage1.8hex must stay in Stage 0 format** - Editable, but only raw hex bytes
+3. **Each stage assembles the next** - Stage N produces Stage N+1
+4. **Forward compatibility** - Higher stages accept lower stage formats
+5. **Self-hosting goal** - Final stage reassembles itself identically
+6. **Use fixaddr.py after editing stage1.8hex** - Recalculates all addresses automatically
 
 ## Related
 
