@@ -1,6 +1,6 @@
-# Stage 1/2 Assembler - Design Lessons
+# Assembler Design Lessons (Stages 1-3)
 
-Lessons learned building Stage 1 (raw hex) and Stage 2 (self-hosting) assemblers.
+Lessons learned building Stage 1 (raw hex), Stage 2 (self-hosting), and Stage 3 (EQU directive) assemblers.
 
 ## Core Architecture
 
@@ -140,9 +140,100 @@ stage2.8hx → STAGE2 → STAGE2.COM (self-hosting verified)
 Any change to stage1.8hx requires `fixaddr.py` to recalculate jump targets.
 Stage2.8hx must NOT use features that STAGE1 doesn't understand.
 
+## Stage 3 Lessons (EQU Implementation)
+
+### Memory Layout Expansion
+
+**Lesson**: When adding significant code, buffers must move to avoid overlap.
+
+Stage 3 added ~300 bytes for EQU support. Original layout had TOKBUF at 0x0620, but code grew past that. When LOOKUP copied to TOKBUF, it corrupted the new CHEQU routine.
+
+**Solution**: Shift all buffers by 0x80 bytes:
+```
+Stage 2 Layout:              Stage 3 Layout:
+TOKBUF: 0620                 TOKBUF: 06A0
+LINBUF: 0680                 LINBUF: 0720
+Vars:   06F0                 Vars:   0770
+IBUF:   0700                 IBUF:   0780
+OBUF:   0780                 OBUF:   0800
+OFCB:   0800                 OFCB:   0880
+SYMTAB: 0840                 SYMTAB: 08C0
+```
+
+**Better approach** (for future): Put variables at a fixed low address right after max expected code size. Code growth then only pushes labels (which the assembler recalculates). Buffers stay safe.
+
+### .8HX Extension Standardization
+
+**Lesson**: When changing input file extension, the ENTIRE bootstrap chain must be rebuilt from cold.
+
+All stages (stage0, stage1, stage2, stage3) were updated to read `.8HX` instead of `.HEX`. This required:
+1. Rebuild SPAZM0.COM from stage0.8hx using `sed 's/;.*//' | xxd -r -p`
+2. SPAZM0 STAGE1 (builds new STAGE1 reading .8HX)
+3. STAGE1 STAGE2 (builds new STAGE2 reading .8HX)
+4. STAGE2 STAGE3 (builds new STAGE3 reading .8HX)
+
+Attempting to use an old stage binary to build new sources fails silently - wrong extension means "No file" error.
+
+### Sync Script Gotcha
+
+**Lesson**: cpmcp with "file already exists" error means files don't update.
+
+The sync-to-disk.sh script showed errors like `cpmcp: can not create 00STAGE3.8HX: file already exists`. Files weren't being replaced!
+
+**Solution**: Delete files before re-syncing:
+```bash
+cpmrm -f ibm-3740 work.dsk "0:STAGE3.8HX"
+cpmcp -f ibm-3740 work.dsk src/stage3.8hx "0:STAGE3.8HX"
+```
+
+Or fix the sync script to delete before copy.
+
+### CP/M 8.3 Filename Limits
+
+**Lesson**: Keep filenames short. CP/M uses 8.3 format.
+
+`TEST-SIMPLE.8HX` truncates unpredictably. Use names like `TESTEQU.8HX` instead of `TEST-EQU.8HX` to avoid confusion.
+
+### LOLOS Environment
+
+**Lesson**: LOLOS CP/M doesn't have DDT (debugger).
+
+Can't use DDT to examine loaded programs. Instead:
+- Use cpmcp to extract files from disk image
+- Use xxd to examine binary contents
+- Use PeekMemory MCP tool during runtime
+
+### EQU Implementation Pattern
+
+**Lesson**: EQU requires a different parsing path than colon-labels.
+
+Syntax `NAME EQU value` (no colon) means CHKLBL's colon scan fails. Solution:
+
+1. **CLNO branch**: When CHKLBL finds whitespace (not colon) after potential label, save position and check for "EQU"
+2. **CHEQU routine**: Case-insensitive check for 'E','Q','U' - returns A=1 if found
+3. **CLEQU handler**: Skip EQU, parse expression to HL, XCHG to DE, call DEFEQU
+4. **DEFEQU routine**: Like DEFSYM but:
+   - Terminates name copy on whitespace (not colon)
+   - Takes value from DE register (not LOCTR)
+
+```
+CHKLBL flow:
+  Scan for colon
+  ├── Found colon → CLYES → call DEFSYM (uses LOCTR)
+  └── Found whitespace → CLNO → check for EQU
+                          ├── EQU found → CLEQU → parse expr → DEFEQU (uses expr value)
+                          └── Not EQU → restore LNPTR, return
+```
+
+### Dead File Cleanup
+
+**Lesson**: Keep source files minimal. Delete duplicates.
+
+`stage0.asm` was a dead file - the real source is `stage0.8hx`. Deleted to avoid confusion. The .8hx format can include assembly-style comments after semicolons.
+
 ## Related Files
 
 - [bootstrap.md](bootstrap.md) - Cold boot pipeline, stage progression
 - [stage1-design.md](stage1-design.md) - Syntax specification
 - [../practices.md](../practices.md) - 8080 coding patterns including file rewind
-- [../plans/directive-impl.md](../plans/directive-impl.md) - Next: DB/DW/DS/EQU
+- [../plans/directive-impl.md](../plans/directive-impl.md) - Next: DB/DW/DS

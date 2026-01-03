@@ -34,27 +34,17 @@ STAGE2.COM doesn't understand these directives, so stage3.8hx stays in Stage 2 f
 
 ## Implementation Order
 
-### 1. EQU - Define Constant
+### 1. EQU - Define Constant ✓ COMPLETE
 **Syntax**: `LABEL EQU expr` (no colon!)
 **Behavior**: Define symbol with value, doesn't advance LOCTR
 
-**Detection**: After label check fails, check if next token is "EQU"
-**Parsing**:
-```
-; In PARSE, after CHKLBL returns:
-; Check if current token is "EQU"
-2A FA 06        ; LHLD LNPTR
-7E              ; MOV A,M - get first char
-FE 45           ; CPI 'E'
-C2 xxxx         ; JNZ not_equ
-23              ; INX H
-7E              ; MOV A,M
-FE 51           ; CPI 'Q'
-C2 xxxx         ; JNZ not_equ
-; ... etc
-```
+**Implementation**: Modified CHKLBL to detect EQU pattern:
+- CLNO: When whitespace found (not colon), save position, check for "EQU"
+- CHEQU: Case-insensitive check for 'E','Q','U' keyword
+- CLEQU: Parse expression, call DEFEQU with value in DE
+- DEFEQU: Like DEFSYM but terminates on whitespace (not colon), uses passed value
 
-**Note**: EQU doesn't use DEFSYM directly - needs separate path since no colon.
+**Test**: `FIVE EQU 5` + `3E FIVE` → outputs `3E 05` ✓
 
 ### 2. DB - Define Bytes
 **Syntax**: `DB expr, expr, 'string'`

@@ -1,28 +1,29 @@
-; STAGE2.HEX - Stage 1 logic in Stage 1 format
-; Assembled by STAGE1.COM
+; STAGE3.HEX - Stage 2 + EQU + DEFB directives
+; Assembled by STAGE2.COM
 ;
-; This is stage1.8hex converted to use labels instead of
-; hardcoded addresses. Same logic, symbolic references.
+; Adds:
+;   - EQU directive: NAME EQU value
+;   - DEFB directive: DEFB expr, expr, 'string'
 ;
-; Memory Layout (same as Stage 1):
-;   0100-061F: Code (~1296 bytes)
-;   0620-069F: Token buffer (128 bytes)
-;   06A0-06EF: Line buffer (80 bytes)
-;   06F0-06FB: Variables (12 bytes)
-;   0700-077F: Input buffer (128 bytes)
-;   0780-07FF: Output buffer (128 bytes)
-;   0800-083F: Output FCB (64 bytes)
-;   0840+:     Symbol table (128 entries x 8 bytes)
+; Memory Layout (code first, buffers high):
+;   0100-07FF: Code (~1800 bytes room)
+;   0800-087F: TOKBUF (128 bytes)
+;   0880-08CF: LINBUF (80 bytes)
+;   08D0-08DF: Variables (16 bytes)
+;   0900-097F: IBUF (128 bytes)
+;   0980-09FF: OBUF (128 bytes)
+;   0A00-0A3F: OFCB (64 bytes)
+;   2000+:     Symbol table (128 entries x 8 bytes)
 ;
-; Variables at 06F0:
-;   06F0: PASS    (1 byte)  - 0=pass1, 1=pass2
-;   06F1: ICNT    (1 byte)  - Input buffer count
-;   06F2: IPTR    (2 bytes) - Input buffer pointer
-;   06F4: OCNT    (1 byte)  - Output buffer count
-;   06F5: OPTR    (2 bytes) - Output buffer pointer
-;   06F7: SYMCNT  (1 byte)  - Symbol count
-;   06F8: LOCTR   (2 bytes) - Location counter
-;   06FA: LNPTR   (2 bytes) - Line pointer
+; Variables at 08D0:
+;   08D0: PASS    (1 byte)  - 0=pass1, 1=pass2
+;   08D1: ICNT    (1 byte)  - Input buffer count
+;   08D2: IPTR    (2 bytes) - Input buffer pointer
+;   08D4: OCNT    (1 byte)  - Output buffer count
+;   08D5: OPTR    (2 bytes) - Output buffer pointer
+;   08D7: SYMCNT  (1 byte)  - Symbol count
+;   08D8: LOCTR   (2 bytes) - Location counter
+;   08DA: LNPTR   (2 bytes) - Line pointer
 
         ORG 0100H
 
@@ -47,7 +48,7 @@ START:
 
 ; Copy FCB to OFCB, set .COM extension
         21 5C 00        ; LXI H,005CH
-        11 00 08        ; LXI D,0800H (OFCB)
+        11 00 0A        ; LXI D,0300 (OFCB)
         06 09           ; MVI B,9
 
 CPFCB:
@@ -79,10 +80,10 @@ ZFCB:
         C2 ZFCB         ; JNZ ZFCB
 
 ; Delete old output, create new
-        11 00 08        ; LXI D,OFCB
+        11 00 0A        ; LXI D,OFCB
         0E 13           ; MVI C,19 (delete)
         CD 05 00        ; CALL BDOS
-        11 00 08        ; LXI D,OFCB
+        11 00 0A        ; LXI D,OFCB
         0E 16           ; MVI C,22 (make)
         CD 05 00        ; CALL BDOS
         3C              ; INR A
@@ -93,18 +94,18 @@ ZFCB:
 ; ============================================================
 INIT:
         AF              ; XRA A
-        32 F0 06        ; STA PASS
-        32 F1 06        ; STA ICNT
-        32 F4 06        ; STA OCNT
-        32 F7 06        ; STA SYMCNT
+        32 D0 08        ; STA PASS
+        32 D1 08        ; STA ICNT
+        32 D4 08        ; STA OCNT
+        32 D7 08        ; STA SYMCNT
 
 ; Set LOCTR to 0100H
         21 00 01        ; LXI H,0100H
-        22 F8 06        ; SHLD LOCTR
+        22 D8 08        ; SHLD LOCTR
 
 ; Init OPTR
-        21 80 07        ; LXI H,0780H (OBUF)
-        22 F5 06        ; SHLD OPTR
+        21 80 09        ; LXI H,0280 (OBUF)
+        22 D5 08        ; SHLD OPTR
 
 ; ============================================================
 ; PASS1 - First pass loop
@@ -134,13 +135,13 @@ P1END:
         0E 0F           ; MVI C,15 (open file)
         CD 05 00        ; CALL BDOS
         AF              ; XRA A (BDOS trashed A)
-        32 F1 06        ; STA ICNT
+        32 D1 08        ; STA ICNT
         3C              ; INR A
-        32 F0 06        ; STA PASS
+        32 D0 08        ; STA PASS
 
 ; Reset LOCTR
         21 00 01        ; LXI H,0100H
-        22 F8 06        ; SHLD LOCTR
+        22 D8 08        ; SHLD LOCTR
 
 ; ============================================================
 ; PASS2 - Second pass loop
@@ -154,7 +155,7 @@ PASS2:
 ; DONE
 DONE:
         CD FLUSH        ; CALL FLUSH
-        11 00 08        ; LXI D,OFCB
+        11 00 0A        ; LXI D,OFCB
         0E 10           ; MVI C,16 (close)
         CD 05 00        ; CALL BDOS
         C3 00 00        ; JMP BOOT
@@ -164,7 +165,7 @@ DONE:
 ; Returns: CY=1 if EOF
 ; ============================================================
 RDLINE:
-        21 80 06        ; LXI H,0680H (LINBUF)
+        21 80 08        ; LXI H,01B0 (LINBUF)
         06 7E           ; MVI B,126
 
 RL1:
@@ -189,8 +190,8 @@ RLTRUN:
 ; RL_EOL
 RLEOL:
         36 00           ; MVI M,0
-        21 80 06        ; LXI H,LINBUF
-        22 FA 06        ; SHLD LNPTR
+        21 80 08        ; LXI H,LINBUF
+        22 DA 08        ; SHLD LNPTR
         B7              ; ORA A (clear CY)
         C9              ; RET
 
@@ -203,7 +204,7 @@ RLEOF:
 ; SKIPWS - Skip whitespace
 ; ============================================================
 SKIPWS:
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
 SKW1:
         7E              ; MOV A,M
         FE 20           ; CPI ' '
@@ -214,7 +215,7 @@ SKW2:
         23              ; INX H
         C3 SKW1         ; JMP SKW1
 SKW3:
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         C9              ; RET
 
 ; ============================================================
@@ -222,7 +223,7 @@ SKW3:
 ; ============================================================
 PARSE:
         CD SKIPWS       ; CALL SKIPWS
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
         7E              ; MOV A,M
         B7              ; ORA A
         C8              ; RZ (empty line)
@@ -241,7 +242,7 @@ PARSE:
 ; CHKLBL - Check for and define label
 ; ============================================================
 CHKLBL:
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
         E5              ; PUSH H (save start)
 
 ; CL1 - Scan for colon
@@ -260,10 +261,29 @@ CL1:
         23              ; INX H
         C3 CL1          ; JMP CL1
 
-; CL_NO - Not a label
+; CL_NO - Not a colon-label, but check for EQU
 CLNO:
-        E1              ; POP H
-        22 FA 06        ; SHLD LNPTR
+        ; Stack: [label start]
+        ; HL points to whitespace after potential label name
+        22 DA 08        ; SHLD LNPTR (save pos at whitespace)
+        CD SKIPWS       ; skip whitespace
+        2A DA 08        ; LHLD LNPTR
+        CD CHEQU        ; check for "EQU"
+        B7              ; ORA A
+        C2 CLEQU        ; JNZ CL_EQU
+        ; Not EQU - restore original LNPTR
+        E1              ; POP H (label start)
+        22 DA 08        ; SHLD LNPTR
+        C9              ; RET
+
+; CL_EQU - Found EQU, parse value and define symbol
+CLEQU:
+        ; LNPTR is past "EQU"
+        CD SKIPWS       ; skip whitespace after EQU
+        CD EXPR         ; parse value -> HL
+        EB              ; XCHG (value to DE)
+        E1              ; POP H (label start)
+        CD DEFEQU       ; define symbol with value in DE
         C9              ; RET
 
 ; CL_YES - Found label, define it
@@ -271,14 +291,14 @@ CLYES:
         E1              ; POP H (start of label)
         CD DEFSYM       ; CALL DEFSYM
 ; Skip past colon
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
 
 CL2:
         7E              ; MOV A,M
         23              ; INX H
         FE 3A           ; CPI ':'
         C2 CL2          ; JNZ CL2
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         C9              ; RET
 
 ; ============================================================
@@ -288,7 +308,7 @@ CL2:
 ; ============================================================
 CHKDIR:
         CD SKIPWS       ; CALL SKIPWS
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
         7E              ; MOV A,M
         B7              ; ORA A
         C8              ; RZ
@@ -303,6 +323,11 @@ CHKDIR:
         CA CKEND        ; JZ CK_END
         FE 65           ; CPI 'e'
         CA CKEND        ; JZ CK_END
+; Check for 'D' (DB/DW/DS) - not a hex byte start
+        FE 44           ; CPI 'D'
+        CA CKDX         ; JZ CK_DX
+        FE 64           ; CPI 'd'
+        CA CKDX         ; JZ CK_DX
         C9              ; RET
 
 ; CK_END - Check if E is followed by N (END) or digit (hex)
@@ -314,7 +339,7 @@ CKEND:
         FE 6E           ; CPI 'n'
         CA CDEND        ; JZ CD_END
 ; Not END, restore LNPTR
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
         C9              ; RET
 
 ; CD_ORG - Parse ORG directive
@@ -323,18 +348,121 @@ CDORG:
         23              ; INX H
         23              ; INX H
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         CD SKIPWS       ; CALL SKIPWS
         CD EXPR         ; CALL EXPR -> HL = new address
-        22 F8 06        ; SHLD LOCTR
+        22 D8 08        ; SHLD LOCTR
         C9              ; RET
 
 ; CD_END - END directive
 CDEND:
 ; Set line to null AND update LNPTR so HEXLN sees empty
-        21 80 06        ; LXI H,LINBUF (0680H)
+        21 80 08        ; LXI H,LINBUF (01B0)
         36 00           ; MVI M,0
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
+        C9              ; RET
+
+; ============================================================
+; CK_DX - Check for DEFB/DEFW/DEFS directives
+; Uses DEFx names to avoid collision with hex byte DB (0xDB)
+; ============================================================
+CKDX:
+        23              ; INX H (now at 2nd char)
+        7E              ; MOV A,M
+        E6 DF           ; ANI 0DFH (uppercase)
+        FE 45           ; CPI 'E'
+        C2 CKDXN        ; JNZ CK_DX_NO (not 'E', so not DEFx)
+        23              ; INX H (now at 3rd char)
+        7E              ; MOV A,M
+        E6 DF           ; ANI 0DFH
+        FE 46           ; CPI 'F'
+        C2 CKDXN        ; JNZ CK_DX_NO
+        23              ; INX H (now at 4th char)
+        7E              ; MOV A,M
+        E6 DF           ; ANI 0DFH
+        FE 42           ; CPI 'B'
+        CA GODEF        ; JZ GO_DEFB
+; Future: DEFW, DEFS checks here
+CKDXN:
+; Not a D-directive, restore LNPTR
+        2A DA 08        ; LHLD LNPTR
+        C9              ; RET
+
+; ============================================================
+; GO_DEFB - Parse DEFB directive
+; Syntax: DEFB expr, expr, 'string'
+; ============================================================
+GODEF:
+        23              ; INX H (skip 'B' of DEFB)
+        22 DA 08        ; SHLD LNPTR
+
+DBLP:
+        CD SKIPWS       ; skip whitespace
+        2A DA 08        ; LHLD LNPTR
+        7E              ; MOV A,M
+        B7              ; ORA A
+        CA DBEND        ; JZ DB_END (end of line)
+        FE 3B           ; CPI ';'
+        CA DBEND        ; JZ DB_END (comment)
+
+; Check for quote (string)
+        FE 27           ; CPI '\''
+        CA DBSTR        ; JZ DB_STRING
+
+; Otherwise parse expression as byte
+        CD EXPR         ; get value -> HL
+        7D              ; MOV A,L
+        CD OUTPUT       ; emit low byte only
+
+; Check for comma
+        CD SKIPWS       ; skip whitespace
+        2A DA 08        ; LHLD LNPTR
+        7E              ; MOV A,M
+        FE 2C           ; CPI ','
+        C2 DBEND        ; JNZ DB_END (done)
+        23              ; INX H (skip comma)
+        22 DA 08        ; SHLD LNPTR
+        C3 DBLP         ; JMP DB_LOOP
+
+; DB_STRING - Output characters between quotes
+DBSTR:
+        23              ; INX H (skip opening quote)
+        22 DA 08        ; SHLD LNPTR
+
+DBST1:
+        2A DA 08        ; LHLD LNPTR
+        7E              ; MOV A,M
+        FE 27           ; CPI '\'' (closing quote)
+        CA DBSTE        ; JZ DB_STR_END
+        B7              ; ORA A
+        CA DBEND        ; JZ DB_END (unexpected end)
+
+; Output character
+        CD OUTPUT       ; emit the character
+        2A DA 08        ; LHLD LNPTR
+        23              ; INX H
+        22 DA 08        ; SHLD LNPTR
+        C3 DBST1        ; JMP loop
+
+DBSTE:
+        23              ; INX H (skip closing quote)
+        22 DA 08        ; SHLD LNPTR
+
+; Check for comma after string
+        CD SKIPWS       ; skip whitespace
+        2A DA 08        ; LHLD LNPTR
+        7E              ; MOV A,M
+        FE 2C           ; CPI ','
+        C2 DBEND        ; JNZ done
+        23              ; INX H (skip comma)
+        22 DA 08        ; SHLD LNPTR
+        C3 DBLP         ; JMP DB_LOOP
+
+; DB_END - Clear line so HEXLN doesn't process
+DBEND:
+        21 80 08        ; LXI H,LINBUF
+        36 00           ; MVI M,0
+        22 DA 08        ; SHLD LNPTR
         C9              ; RET
 
 ; ============================================================
@@ -346,7 +474,7 @@ CDEND:
 ; ============================================================
 HEXLN:
         CD SKIPWS       ; CALL SKIPWS
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
         7E              ; MOV A,M
         B7              ; ORA A
         C8              ; RZ (end of line)
@@ -419,7 +547,7 @@ PARB:
         CD HEXVAL       ; CALL HEXVAL
         B0              ; ORA B
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         CD OUTPUT       ; CALL OUTPUT
         C3 HEXLN        ; JMP HEXLN
 
@@ -453,7 +581,7 @@ PARW:
         CD HEXVAL       ; CALL HEXVAL
         B0              ; ORA B
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
 ; Output low byte first
         CD OUTPUT       ; CALL OUTPUT
         F1              ; POP PSW
@@ -463,7 +591,7 @@ PARW:
 ; HX_LO - Low byte prefix (<SYMBOL)
 HXLO:
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         CD LOOKUP       ; CALL LOOKUP
         7D              ; MOV A,L
         CD OUTPUT       ; CALL OUTPUT
@@ -472,7 +600,7 @@ HXLO:
 ; HX_HI - High byte prefix (>SYMBOL)
 HXHI:
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         CD LOOKUP       ; CALL LOOKUP
         7C              ; MOV A,H
         CD OUTPUT       ; CALL OUTPUT
@@ -495,12 +623,12 @@ HXSYM:
 GETCHR:
         C5              ; PUSH B
         E5              ; PUSH H
-        3A F1 06        ; LDA ICNT
+        3A D1 08        ; LDA ICNT
         B7              ; ORA A
         C2 GC1          ; JNZ GC1
 
 ; Buffer empty, read sector
-        11 00 07        ; LXI D,0700H (IBUF)
+        11 00 09        ; LXI D,0200 (IBUF)
         0E 1A           ; MVI C,26 (set DMA)
         CD 05 00        ; CALL BDOS
         11 5C 00        ; LXI D,FCB
@@ -509,19 +637,19 @@ GETCHR:
         B7              ; ORA A
         C2 GCEOF        ; JNZ GC_EOF
         3E 80           ; MVI A,128
-        32 F1 06        ; STA ICNT
-        21 00 07        ; LXI H,IBUF
-        22 F2 06        ; SHLD IPTR
+        32 D1 08        ; STA ICNT
+        21 00 09        ; LXI H,0200 (IBUF)
+        22 D2 08        ; SHLD IPTR
 
 GC1:
-        2A F2 06        ; LHLD IPTR
+        2A D2 08        ; LHLD IPTR
         7E              ; MOV A,M
         23              ; INX H
-        22 F2 06        ; SHLD IPTR
+        22 D2 08        ; SHLD IPTR
         F5              ; PUSH PSW
-        3A F1 06        ; LDA ICNT
+        3A D1 08        ; LDA ICNT
         3D              ; DCR A
-        32 F1 06        ; STA ICNT
+        32 D1 08        ; STA ICNT
         F1              ; POP PSW
         B7              ; ORA A
         CA GCEOF        ; JZ GC_EOF (null=EOF)
@@ -543,7 +671,7 @@ GCEOF:
 ; Returns: CY=1 if not hex
 ; ============================================================
 ISHEX:
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
         7E              ; MOV A,M
 ; Fall through to ISHEX_A
 
@@ -591,7 +719,7 @@ HV2:
 ; ============================================================
 OUTPUT:
         F5              ; PUSH PSW
-        3A F0 06        ; LDA PASS
+        3A D0 08        ; LDA PASS
         B7              ; ORA A
         CA OUTP1        ; JZ OUT_P1
         F1              ; POP PSW
@@ -599,14 +727,14 @@ OUTPUT:
 ; Pass 2 - output byte
         E5              ; PUSH H
         F5              ; PUSH PSW
-        2A F5 06        ; LHLD OPTR
+        2A D5 08        ; LHLD OPTR
         F1              ; POP PSW
         77              ; MOV M,A
         23              ; INX H
-        22 F5 06        ; SHLD OPTR
-        3A F4 06        ; LDA OCNT
+        22 D5 08        ; SHLD OPTR
+        3A D4 08        ; LDA OCNT
         3C              ; INR A
-        32 F4 06        ; STA OCNT
+        32 D4 08        ; STA OCNT
         FE 80           ; CPI 128
         CA OUTFUL       ; JZ OUT_FULL
         E1              ; POP H
@@ -615,10 +743,10 @@ OUTPUT:
 ; OUT_FULL - Buffer full, write sector
 OUTFUL:
         CD WRSEC        ; CALL WRSEC
-        21 80 07        ; LXI H,OBUF
-        22 F5 06        ; SHLD OPTR
+        21 80 09        ; LXI H,0280 (OBUF)
+        22 D5 08        ; SHLD OPTR
         AF              ; XRA A
-        32 F4 06        ; STA OCNT
+        32 D4 08        ; STA OCNT
         E1              ; POP H
         C9              ; RET
 
@@ -626,9 +754,9 @@ OUTFUL:
 OUTP1:
         F1              ; POP PSW
         E5              ; PUSH H
-        2A F8 06        ; LHLD LOCTR
+        2A D8 08        ; LHLD LOCTR
         23              ; INX H
-        22 F8 06        ; SHLD LOCTR
+        22 D8 08        ; SHLD LOCTR
         E1              ; POP H
         C9              ; RET
 
@@ -636,26 +764,26 @@ OUTP1:
 ; FLUSH - Flush output buffer
 ; ============================================================
 FLUSH:
-        3A F4 06        ; LDA OCNT
+        3A D4 08        ; LDA OCNT
         B7              ; ORA A
         C8              ; RZ
-        2A F5 06        ; LHLD OPTR
+        2A D5 08        ; LHLD OPTR
 FL1:
-        3A F4 06        ; LDA OCNT
+        3A D4 08        ; LDA OCNT
         FE 80           ; CPI 128
         D2 WRSEC        ; JNC WRSEC
         36 00           ; MVI M,0
         23              ; INX H
         3C              ; INR A
-        32 F4 06        ; STA OCNT
+        32 D4 08        ; STA OCNT
         C3 FL1          ; JMP FL1
 
 ; WRSEC - Write sector
 WRSEC:
-        11 80 07        ; LXI D,OBUF
+        11 80 09        ; LXI D,0280 (OBUF)
         0E 1A           ; MVI C,26
         CD 05 00        ; CALL BDOS
-        11 00 08        ; LXI D,OFCB
+        11 00 0A        ; LXI D,OFCB
         0E 15           ; MVI C,21 (write seq)
         CD 05 00        ; CALL BDOS
         C9              ; RET
@@ -699,16 +827,16 @@ MUDF:
 ; Value = current LOCTR
 ; ============================================================
 DEFSYM:
-; Symbol table at 0840, 8 bytes per entry (6 name + 2 value)
+; Symbol table at 2000, 8 bytes per entry (6 name + 2 value)
         E5              ; PUSH H (label start)
-        3A F7 06        ; LDA SYMCNT
+        3A D7 08        ; LDA SYMCNT
 ; Calculate slot: SYMTAB + SYMCNT * 8 (16-bit to handle >32 symbols)
         6F              ; MOV L,A
         26 00           ; MVI H,0
         29              ; DAD H (x2)
         29              ; DAD H (x4)
         29              ; DAD H (x8)
-        11 40 08        ; LXI D,SYMTAB
+        11 00 20        ; LXI D,SYMTAB
         19              ; DAD D
         EB              ; XCHG (DE = slot address)
         E1              ; POP H (label start)
@@ -748,7 +876,7 @@ DS2A:
 
 ; DS3 - Store value (LOCTR)
 DS3:
-        2A F8 06        ; LHLD LOCTR
+        2A D8 08        ; LHLD LOCTR
         7D              ; MOV A,L
         12              ; STAX D
         13              ; INX D
@@ -756,9 +884,9 @@ DS3:
         12              ; STAX D
 
 ; Increment symbol count
-        3A F7 06        ; LDA SYMCNT
+        3A D7 08        ; LDA SYMCNT
         3C              ; INR A
-        32 F7 06        ; STA SYMCNT
+        32 D7 08        ; STA SYMCNT
         C9              ; RET
 
 ; ============================================================
@@ -767,8 +895,8 @@ DS3:
 ; ============================================================
 LOOKUP:
 ; Read symbol from line into temp, then search
-        2A FA 06        ; LHLD LNPTR
-        11 20 06        ; LXI D,TOKBUF (0620)
+        2A DA 08        ; LHLD LNPTR
+        11 00 08        ; LXI D,TOKBUF (0130)
         06 06           ; MVI B,6
 
 ; LK0 - Copy symbol to TOKBUF
@@ -829,11 +957,11 @@ LK0E:
 
 ; LK1 - Save updated line pointer
 LK1:
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
 
 ; Search symbol table
-        21 40 08        ; LXI H,SYMTAB
-        3A F7 06        ; LDA SYMCNT
+        21 00 20        ; LXI H,SYMTAB
+        3A D7 08        ; LDA SYMCNT
         B7              ; ORA A
         CA LKNF         ; JZ LK_NF (not found)
         47              ; MOV B,A
@@ -841,7 +969,7 @@ LK1:
 ; LK2 - Compare entry with TOKBUF
 LK2:
         E5              ; PUSH H
-        11 20 06        ; LXI D,TOKBUF (0620)
+        11 00 08        ; LXI D,TOKBUF (0130)
         0E 06           ; MVI C,6
 ; LK3
 LK3:
@@ -874,7 +1002,7 @@ LK4:
 LKNF:
 ; In pass 1, return 0
 ; In pass 2, error
-        3A F0 06        ; LDA PASS
+        3A D0 08        ; LDA PASS
         B7              ; ORA A
         CA LKNF0        ; JZ LK_NF0
 ; Pass 2 - error
@@ -891,7 +1019,7 @@ LKNF0:
 ; ============================================================
 EXPR:
         CD SKIPWS       ; CALL SKIPWS
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
         7E              ; MOV A,M
 
 ; Check for $ prefix (hex)
@@ -909,7 +1037,7 @@ EXPR:
 
 ; EX_NUM - Accumulate digits
 EXNUM:
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
 ; Use DE for accumulator
         E5              ; PUSH H
         21 00 00        ; LXI H,0
@@ -944,7 +1072,7 @@ EXN1A:
 ; EX_DIG - Is hex digit
 EXDIG:
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
 ; Shift DE left 4, add digit
         E5              ; PUSH H
         62              ; MOV H,D
@@ -981,7 +1109,7 @@ EXDONE:
 ; EX_NH - 'H' found, skip it and return
 EXNH:
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         EB              ; XCHG
         C9              ; RET
 
@@ -993,10 +1121,10 @@ EXSYM:
 ; EX_HEX - $XX hex format
 EXHEX:
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         21 00 00        ; LXI H,0
         EB              ; XCHG
-        2A FA 06        ; LHLD LNPTR
+        2A DA 08        ; LHLD LNPTR
 
 ; EXH1
 EXH1:
@@ -1019,7 +1147,7 @@ EXH1A:
 ; EXH_DG
 EXHDG:
         23              ; INX H
-        22 FA 06        ; SHLD LNPTR
+        22 DA 08        ; SHLD LNPTR
         E5              ; PUSH H
         62              ; MOV H,D
         6B              ; MOV L,E
@@ -1044,5 +1172,98 @@ EXHAD:
         83              ; ADD E
         5F              ; MOV E,A
         C3 EXH1         ; JMP EXH1
+
+; ============================================================
+; CHEQU - Check if current position is "EQU" (case-insensitive)
+; Input: HL = current position (from LNPTR)
+; Output: A = 1 if EQU found (LNPTR advanced past it), 0 otherwise
+; ============================================================
+CHEQU:
+        7E              ; MOV A,M
+        E6 DF           ; ANI 0DFH (uppercase)
+        FE 45           ; CPI 'E'
+        C2 CHENO        ; JNZ CHE_NO
+        23              ; INX H
+        7E              ; MOV A,M
+        E6 DF           ; ANI 0DFH
+        FE 51           ; CPI 'Q'
+        C2 CHENO        ; JNZ CHE_NO
+        23              ; INX H
+        7E              ; MOV A,M
+        E6 DF           ; ANI 0DFH
+        FE 55           ; CPI 'U'
+        C2 CHENO        ; JNZ CHE_NO
+        ; Found EQU!
+        23              ; INX H
+        22 DA 08        ; SHLD LNPTR
+        3E 01           ; MVI A,1
+        C9              ; RET
+CHENO:
+        AF              ; XRA A
+        C9              ; RET
+
+; ============================================================
+; DEFEQU - Define symbol with explicit value
+; Input: HL = label start, DE = value to store
+; Like DEFSYM but terminates name at whitespace, uses DE for value
+; ============================================================
+DEFEQU:
+        D5              ; PUSH D (save value)
+        E5              ; PUSH H (save label start)
+        ; Calculate slot: SYMTAB + SYMCNT * 8
+        3A D7 08        ; LDA SYMCNT
+        6F              ; MOV L,A
+        26 00           ; MVI H,0
+        29              ; DAD H (x2)
+        29              ; DAD H (x4)
+        29              ; DAD H (x8)
+        11 00 20        ; LXI D,SYMTAB
+        19              ; DAD D
+        EB              ; XCHG (DE = slot address)
+        E1              ; POP H (label start)
+        ; Copy up to 6 chars until whitespace
+        06 06           ; MVI B,6
+DEQ1:
+        7E              ; MOV A,M
+        FE 20           ; CPI ' '
+        CA DEQ2         ; JZ DEQ2 (end of name)
+        FE 09           ; CPI TAB
+        CA DEQ2         ; JZ DEQ2
+        ; Uppercase
+        FE 61           ; CPI 'a'
+        DA DEQ1A        ; JC DEQ1A
+        FE 7B           ; CPI 'z'+1
+        D2 DEQ1A        ; JNC DEQ1A
+        D6 20           ; SUI 20H
+DEQ1A:
+        12              ; STAX D
+        13              ; INX D
+        23              ; INX H
+        05              ; DCR B
+        C2 DEQ1         ; JNZ DEQ1
+; DEQ2 - Pad with spaces
+DEQ2:
+        78              ; MOV A,B
+        B7              ; ORA A
+        CA DEQ3         ; JZ DEQ3
+        3E 20           ; MVI A,' '
+DEQ2A:
+        12              ; STAX D
+        13              ; INX D
+        05              ; DCR B
+        C2 DEQ2A        ; JNZ DEQ2A
+; DEQ3 - Store value from stack
+DEQ3:
+        E1              ; POP H (saved value)
+        7D              ; MOV A,L
+        12              ; STAX D
+        13              ; INX D
+        7C              ; MOV A,H
+        12              ; STAX D
+        ; Increment symbol count
+        3A D7 08        ; LDA SYMCNT
+        3C              ; INR A
+        32 D7 08        ; STA SYMCNT
+        C9              ; RET
 
         END

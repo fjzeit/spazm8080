@@ -4,7 +4,7 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Bootstrap Stage 2 - SELF-HOSTING ACHIEVED
+**Phase**: Bootstrap Stage 3 - EQU + DEFB DIRECTIVES COMPLETE
 
 ### Cold Boot Pipeline (PROTECTED)
 
@@ -13,7 +13,9 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 | `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes | FROZEN |
 | `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | Complete |
 | `src/stage2.8hx` | Stage 1 | STAGE1 | STAGE2.COM | 1408 bytes | FROZEN |
-| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1620 bytes | Pending |
+| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1700 bytes | EQU+DEFB done |
+
+All stages now read `.8HX` extension (cold bootstrap updated).
 
 *stage1.8hx can be modified but **must remain in Stage 0 format** (raw hex bytes). Use `fixaddr.py` after edits.
 
@@ -21,30 +23,38 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 - **Two-pass assembly**: Forward references resolved via symbol table
 - **Labels**: `LABEL:` defines symbol at current address
-- **Directives**: ORG, END
+- **Directives**: ORG, END, EQU, DEFB (Stage 3)
 - **Symbol references**: `C3 LABEL` emits address bytes
 - **Low/high byte operators**: `<LABEL`, `>LABEL`
 - **Token-length parsing**: 2 chars=byte, 4 chars=word, else=label
 - **Self-hosting**: Stage 2 assembles itself identically
+- **EQU directive**: `NAME EQU value` defines constant (no colon, value-based)
+- **DEFB directive**: `DEFB expr, expr, 'string'` emits bytes and strings
 
 ### Not Yet Implemented
 
-- EQU directive
-- DB, DW, DS directives
+- DEFW directive (16-bit words)
+- DEFS directive (reserve space)
 - Expression arithmetic (+, -)
 
 ### Next Steps
 
 See [plans/directive-impl.md](plans/directive-impl.md) for implementation plan:
-1. Create stage3.8hx (copy of stage2.8hx)
-2. Add EQU directive (simplest, no output)
-3. Add DB directive (strings and bytes)
-4. Add DW directive (16-bit words)
-5. Add DS directive (reserve space)
+1. ~~Create stage3.8hx (copy of stage2.8hx)~~ ✓
+2. ~~Add EQU directive (simplest, no output)~~ ✓
+3. ~~Add DEFB directive (strings and bytes)~~ ✓
+4. Add DEFW directive (16-bit words)
+5. Add DEFS directive (reserve space)
+
+### Critical Rule: Hex Label Names
+
+**Labels in `.8hx` files must contain at least one non-hex character (G-Z, underscore).**
+
+The token parser treats 4-char all-hex strings as word literals. A label like `CDDB` will be interpreted as the hex value `0xCDDB` instead of a symbol. Use names like `GODEF` (G, O not hex) instead. See [workflow.md](assembler/workflow.md#hex-format-source-rules) for details.
 
 ### Resume Prompt
 
-"Continue spazm8080 development. Stage 2 is self-hosting and frozen. Next: create stage3.8hx and add EQU directive following plans/directive-impl.md."
+"Continue spazm8080 development. Stage 3 has EQU+DEFB working. Next: add DEFW directive following plans/directive-impl.md."
 
 ## Goals
 
@@ -78,13 +88,15 @@ Development uses heh8080 emulator with MCP server integration, enabling Claude t
 ## Quick Reference
 
 ### MCP Server
-Configured in `.claude/settings.json` - available as `cpm` MCP server with tools:
+Configured in `.mcp.json` - available as `cpm` MCP server with tools:
 - `SendInput`, `ReadScreen`, `WaitForText` - console interaction
 - `PeekMemory`, `PokeMemory` - memory access
-- `Status`, `Reset`, `MountDisk`, `DiskInfo` - machine control
+- `Status`, `Reset`, `MountDisk`, `DiskInfo`, `RefreshDisk` - machine control
 - `GetCpuState`, `Step`, `StopMachine`, `Continue` - execution control
 - `EnableTrace`, `DisableTrace`, `GetTrace`, `ClearTrace` - instruction tracing
 - `SetBreakpoint`, `ClearBreakpoint`, `ListBreakpoints` - breakpoints
+
+**Important:** After `sync-to-disk.sh`, call `RefreshDisk(0)` to see changes without rebooting.
 
 ### Sync Workflow
 ```bash
@@ -104,4 +116,5 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | `scripts/fixaddr.py` | **Critical**: Address correction after .8hx edits |
 | `src/stage0.8hx` | Stage 0 source - FROZEN |
 | `src/stage1.8hx` | Stage 1 source (1296 bytes) - raw hex format |
-| `src/stage2.8hx` | Stage 2 source (1408 bytes) - self-hosting |
+| `src/stage2.8hx` | Stage 2 source (1408 bytes) - self-hosting, FROZEN |
+| `src/stage3.8hx` | Stage 3 source - adds EQU, memory layout expanded |

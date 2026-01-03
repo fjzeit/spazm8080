@@ -22,5 +22,14 @@ for f in "$SRC_DIR"/*.asm; do
     fi
 done
 
+# Copy all .8hx files to user 0 as .8HX
+for f in "$SRC_DIR"/*.8hx; do
+    if [ -f "$f" ]; then
+        base=$(basename "$f" | tr '[:lower:]' '[:upper:]')
+        echo "  $f -> 0:$base"
+        cpmcp -f "$FORMAT" "$DISK" "$f" "0:$base"
+    fi
+done
+
 echo "Done. Files on disk:"
 cpmls -f "$FORMAT" "$DISK"

@@ -72,6 +72,40 @@ def parse_hex_bytes(line: str) -> list[int]:
     return bytes_out
 
 
+def parse_org_directive(line: str) -> Optional[int]:
+    """
+    Parse ORG directive from a line.
+    Returns the new address if ORG found, None otherwise.
+    Handles: ORG 0400H, ORG 0100H, org $0400, etc.
+    """
+    # Get content before semicolon
+    if ';' in line:
+        content = line.split(';')[0]
+    else:
+        content = line
+
+    content = content.strip().upper()
+    if not content.startswith('ORG'):
+        return None
+
+    # Extract the address part
+    addr_part = content[3:].strip()
+    if not addr_part:
+        return None
+
+    # Handle different formats: 0400H, $0400, 0x0400, 0400
+    addr_part = addr_part.rstrip('H')  # Remove trailing H
+    if addr_part.startswith('$'):
+        addr_part = addr_part[1:]
+    elif addr_part.startswith('0X'):
+        addr_part = addr_part[2:]
+
+    try:
+        return int(addr_part, 16)
+    except ValueError:
+        return None
+
+
 def parse_label_def(line: str) -> Optional[tuple[str, int]]:
     """
     Parse a label definition from a comment line.
@@ -85,6 +119,20 @@ def parse_label_def(line: str) -> Optional[tuple[str, int]]:
         addr = int(match.group(1), 16)
         name = match.group(2).upper()
         return (name, addr)
+    return None
+
+
+def parse_standalone_label(line: str) -> Optional[str]:
+    """
+    Parse a standalone label definition (assembly-style).
+    Format: LABELNAME:
+    Returns label name or None
+    """
+    # Match: label name at start of line, followed by colon
+    # Must be at start (no leading whitespace before label)
+    match = re.match(r'^([A-Za-z_][A-Za-z0-9_]*):[ \t]*$', line.rstrip())
+    if match:
+        return match.group(1).upper()
     return None
 
 
@@ -166,36 +214,54 @@ class AddressFixer:
         as variable/constant declarations and not recalculated.
         """
         current_addr = self.base_addr
-        seen_code = False  # Have we seen any code bytes yet?
+        seen_org = False  # Have we seen an ORG directive?
 
         for line_num, line in enumerate(self.lines, 1):
+            # Check for ORG directive - updates current address
+            org_addr = parse_org_directive(line)
+            if org_addr is not None:
+                current_addr = org_addr
+                seen_org = True
+                continue
+
             # Count bytes in this line FIRST to determine if this line has code
             hex_bytes = parse_hex_bytes(line)
 
-            # Check for label definition in comment-only lines
-            label_def = parse_label_def(line.strip())
-            if label_def:
-                name, declared_addr = label_def
-
-                # Skip variable declarations in header (before any code)
-                # These have addresses >= 0x0500 typically (data area)
-                if not seen_code and declared_addr >= 0x0500:
-                    continue  # Skip variable declarations
-
-                if name in self.labels:
-                    print(f"Warning: Duplicate label '{name}' at line {line_num}")
+            # Check for standalone label (LABELNAME:)
+            standalone = parse_standalone_label(line)
+            if standalone:
+                if standalone in self.labels:
+                    print(f"Warning: Duplicate label '{standalone}' at line {line_num}")
                 else:
-                    self.labels[name] = Label(
-                        name=name,
-                        declared_addr=declared_addr,
+                    self.labels[standalone] = Label(
+                        name=standalone,
+                        declared_addr=current_addr,  # No declared addr, use actual
                         actual_addr=current_addr,
                         line_num=line_num
                     )
-                    self.addr_to_label[declared_addr] = name
+                    self.addr_to_label[current_addr] = standalone
+                continue
 
-            # Track if we've seen actual code
+            # Check for label definition in comment (;XXXX: LABELNAME)
+            # Only process after first ORG to skip variable documentation
+            if seen_org:
+                label_def = parse_label_def(line.strip())
+                if label_def:
+                    name, declared_addr = label_def
+
+                    if name in self.labels:
+                        print(f"Warning: Duplicate label '{name}' at line {line_num}")
+                    else:
+                        self.labels[name] = Label(
+                            name=name,
+                            declared_addr=declared_addr,
+                            actual_addr=current_addr,
+                            line_num=line_num
+                        )
+                        self.addr_to_label[declared_addr] = name
+
+            # Track code bytes
             if hex_bytes:
-                seen_code = True
                 current_addr += len(hex_bytes)
 
         print(f"First pass complete: {len(self.labels)} labels found")
@@ -209,6 +275,12 @@ class AddressFixer:
         current_addr = self.base_addr
 
         for line_num, line in enumerate(self.lines, 1):
+            # Check for ORG directive - updates current address
+            org_addr = parse_org_directive(line)
+            if org_addr is not None:
+                current_addr = org_addr
+                continue
+
             hex_bytes = parse_hex_bytes(line)
             if not hex_bytes:
                 continue

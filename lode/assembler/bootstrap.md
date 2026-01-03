@@ -36,13 +36,13 @@ sed 's/;.*//' src/stage0.8hx | xxd -r -p > /tmp/spazm0.com
 
 # 3. Copy Stage 0 and Stage 1 source to disk
 cpmcp -f ibm-3740 work.dsk /tmp/spazm0.com 0:SPAZM0.COM
-cpmcp -f ibm-3740 work.dsk src/stage1.8hx 0:STAGE1.HEX
+cpmcp -f ibm-3740 work.dsk src/stage1.8hx 0:STAGE1.8HX
 
 # 4. Boot CP/M and assemble Stage 1
 A>SPAZM0 STAGE1                          # Produces STAGE1.COM (1296 bytes)
 
 # 5. Copy Stage 2 source and assemble
-cpmcp -f ibm-3740 work.dsk src/stage2.8hx 0:STAGE2.HEX
+cpmcp -f ibm-3740 work.dsk src/stage2.8hx 0:STAGE2.8HX
 A>STAGE1 STAGE2                          # Produces STAGE2.COM (1408 bytes)
 
 # 6. Verify self-hosting
@@ -135,7 +135,7 @@ BUF:    DS 128          ; Reserve space
 
 ## Stage 0 Details
 
-Minimal hex-to-COM converter. Reads `.HEX`, writes `.COM`.
+Minimal hex-to-COM converter. Reads `.8HX`, writes `.COM`.
 
 ### Input Rules
 - Hex byte pairs separated by whitespace (space, tab, CR, LF)
@@ -162,7 +162,7 @@ Minimal hex-to-COM converter. Reads `.HEX`, writes `.COM`.
 
 ## Stage 1 Details
 
-Two-pass assembler with labels. Reads `.HEX`, writes `.COM`.
+Two-pass assembler with labels. Reads `.8HX`, writes `.COM`.
 
 ### Capabilities
 - Labels with colon suffix: `LABEL:`
