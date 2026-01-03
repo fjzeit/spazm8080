@@ -69,9 +69,9 @@ FORWARD DEVELOPMENT (uses Stage 1 format):
 ┌─────────────────────────────────────────────────────────────┐
 │  Stage 2: src/stage2.8hx → STAGE2.COM                      │
 │  Format: Stage 1 syntax (labels, symbols)                   │
-│  New: DB, DW, DS, EQU directives                            │
-│  Goal: Self-hosting (can reassemble itself)                 │
-│  Status: IN PROGRESS (source exists, ready to assemble)     │
+│  Capabilities: Same as Stage 1 (labels, ORG, END, </>)      │
+│  Status: COMPLETE + SELF-HOSTING (1408 bytes)               │
+│  Note: DB, DW, DS, EQU directives pending                   │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼

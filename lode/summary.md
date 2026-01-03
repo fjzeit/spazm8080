@@ -4,15 +4,15 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Bootstrap Stage 2 - Circular Bootstrap Ready
+**Phase**: Bootstrap Stage 2 - SELF-HOSTING ACHIEVED
 
 ### Cold Boot Pipeline (PROTECTED)
 
 | File | Format | Assembler | Output | Status |
 |------|--------|-----------|--------|--------|
 | `src/stage0.8hx` | Raw hex only | Hand/trivial | SPAZM0.COM (432 bytes) | FROZEN |
-| `src/stage1.8hx` | Raw hex + comments | SPAZM0 | STAGE1.COM (1280 bytes) | Complete |
-| `src/stage2.8hx` | Labels + directives | STAGE1 | STAGE2.COM (1280 bytes) | Needs update |
+| `src/stage1.8hx` | Raw hex + comments | SPAZM0 | STAGE1.COM (1296 bytes) | Complete |
+| `src/stage2.8hx` | Labels + directives | STAGE1 | STAGE2.COM (1408 bytes) | **SELF-HOSTING** |
 
 *stage1.8hx can be modified but **must remain in Stage 0 format** (raw hex bytes). Use `fixaddr.py` after edits.
 
@@ -22,32 +22,31 @@ SPAZM0.COM (432 bytes) - hex-to-COM converter. Reads raw hex bytes, writes `.COM
 
 ### Stage 1 Complete ✓
 
-STAGE1.COM (1280 bytes) - two-pass assembler with:
+STAGE1.COM (1296 bytes) - two-pass assembler with:
 - Labels (`LABEL:`)
 - ORG, END directives
 - Symbol references in hex (`C3 LABEL`)
 - Low/high byte operators (`<LABEL`, `>LABEL`)
 - **Token-length parsing**: 2 chars=byte, 4 chars=word, else=label
 - **Proper file rewind** for pass 2 (re-open to reload extent 0)
-
-**7 bugs fixed** (2026-01-03): GETCHR/OUTPUT register preservation, HX_LO/HX_HI double output, CD_END LNPTR update, token-length parsing, variable address overlap, file rewind for pass 2. See `lode/assembler/stage1-testing.md`.
+- **CHKDIR fix**: Distinguishes `END` from hex bytes like `E5`
 
 **Not yet implemented**: EQU, DB, DW, DS, expression arithmetic
 
-### Stage 2 Milestone ✓
+### Stage 2 Complete + Self-Hosting ✓
 
-STAGE1.COM successfully assembled stage2.8hx → STAGE2.COM (1280 bytes). The two-pass assembler correctly handles label references and forward references.
-
-**Note**: The produced STAGE2.COM has OLD stage1 logic (pre-fixes). For full circular bootstrap, stage2.8hx needs to be updated with current fixes.
+STAGE2.COM (1408 bytes) - identical logic to Stage 1, written in Stage 1 format.
+- Successfully assembles itself: `STAGE2 STAGE2` produces identical binary
+- Circular bootstrap verified
 
 ### Next Steps
-1. Update stage2.8hx with current stage1 fixes (variable addresses, file rewind)
-2. Verify circular bootstrap: STAGE2.COM can assemble stage2.8hx
-3. Add DB, DW, DS, EQU directives
-4. Achieve self-hosting: updated Stage 2 assembles itself
+1. Add DB directive to stage2
+2. Add DW directive to stage2
+3. Add DS directive to stage2
+4. Add EQU directive to stage2
 
 ### Resume Prompt
-"Continue spazm8080 development. Stage 1 (1280 bytes, 7 bugs fixed) successfully assembled stage2.8hx. Next: update stage2.8hx with current fixes for circular bootstrap, then add DB/DW/DS/EQU."
+"Continue spazm8080 development. Stage 2 is self-hosting. Next: add DB/DW/DS/EQU directives to stage2."
 
 ## Goals
 
@@ -107,4 +106,4 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | `scripts/fixaddr.py` | **Critical**: Address correction after .8hx edits |
 | `src/stage0.8hx` | Stage 0 source - FROZEN |
 | `src/stage1.8hx` | Stage 1 source (1280 bytes) - raw hex format |
-| `src/stage2.8hx` | Stage 2 source - Stage 1 format with labels (needs update) |
+| `src/stage2.8hx` | Stage 2 source (1408 bytes) - self-hosting |

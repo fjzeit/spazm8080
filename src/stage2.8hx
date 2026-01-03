@@ -5,16 +5,24 @@
 ; hardcoded addresses. Same logic, symbolic references.
 ;
 ; Memory Layout (same as Stage 1):
-;   0100-057F: Code (~1152 bytes)
-;   0580-058F: Variables
-;   0600-067F: Token buffer
-;   0680-06FF: Line buffer
-;   0700-077F: Input buffer (used as IBUF, but GETCHR uses 0840H)
-;   0780-07FF: Output buffer
-;   0800-083F: Output FCB
-;   0840+:     Symbol table (extended for 128 entries)
+;   0100-061F: Code (~1296 bytes)
+;   0620-069F: Token buffer (128 bytes)
+;   06A0-06EF: Line buffer (80 bytes)
+;   06F0-06FB: Variables (12 bytes)
+;   0700-077F: Input buffer (128 bytes)
+;   0780-07FF: Output buffer (128 bytes)
+;   0800-083F: Output FCB (64 bytes)
+;   0840+:     Symbol table (128 entries x 8 bytes)
 ;
-; Note: Variable addresses remain hardcoded (they're data, not code)
+; Variables at 06F0:
+;   06F0: PASS    (1 byte)  - 0=pass1, 1=pass2
+;   06F1: ICNT    (1 byte)  - Input buffer count
+;   06F2: IPTR    (2 bytes) - Input buffer pointer
+;   06F4: OCNT    (1 byte)  - Output buffer count
+;   06F5: OPTR    (2 bytes) - Output buffer pointer
+;   06F7: SYMCNT  (1 byte)  - Symbol count
+;   06F8: LOCTR   (2 bytes) - Location counter
+;   06FA: LNPTR   (2 bytes) - Line pointer
 
         ORG 0100H
 
@@ -85,18 +93,18 @@ ZFCB:
 ; ============================================================
 INIT:
         AF              ; XRA A
-        32 80 05        ; STA PASS
-        32 81 05        ; STA ICNT
-        32 84 05        ; STA OCNT
-        32 87 05        ; STA SYMCNT
+        32 F0 06        ; STA PASS
+        32 F1 06        ; STA ICNT
+        32 F4 06        ; STA OCNT
+        32 F7 06        ; STA SYMCNT
 
 ; Set LOCTR to 0100H
         21 00 01        ; LXI H,0100H
-        22 88 05        ; SHLD LOCTR
+        22 F8 06        ; SHLD LOCTR
 
 ; Init OPTR
         21 80 07        ; LXI H,0780H (OBUF)
-        22 85 05        ; SHLD OPTR
+        22 F5 06        ; SHLD OPTR
 
 ; ============================================================
 ; PASS1 - First pass loop
@@ -120,13 +128,19 @@ REWIND:
 P1END:
         AF              ; XRA A
         32 7C 00        ; STA FCB+32 (reset CR)
-        32 81 05        ; STA ICNT
+        32 68 00        ; STA FCB+12 (reset extent)
+; Re-open file to reload extent 0 allocation info
+        11 5C 00        ; LXI D,FCB
+        0E 0F           ; MVI C,15 (open file)
+        CD 05 00        ; CALL BDOS
+        AF              ; XRA A (BDOS trashed A)
+        32 F1 06        ; STA ICNT
         3C              ; INR A
-        32 80 05        ; STA PASS
+        32 F0 06        ; STA PASS
 
 ; Reset LOCTR
         21 00 01        ; LXI H,0100H
-        22 88 05        ; SHLD LOCTR
+        22 F8 06        ; SHLD LOCTR
 
 ; ============================================================
 ; PASS2 - Second pass loop
@@ -176,7 +190,7 @@ RLTRUN:
 RLEOL:
         36 00           ; MVI M,0
         21 80 06        ; LXI H,LINBUF
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         B7              ; ORA A (clear CY)
         C9              ; RET
 
@@ -189,7 +203,7 @@ RLEOF:
 ; SKIPWS - Skip whitespace
 ; ============================================================
 SKIPWS:
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
 SKW1:
         7E              ; MOV A,M
         FE 20           ; CPI ' '
@@ -200,7 +214,7 @@ SKW2:
         23              ; INX H
         C3 SKW1         ; JMP SKW1
 SKW3:
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         C9              ; RET
 
 ; ============================================================
@@ -208,7 +222,7 @@ SKW3:
 ; ============================================================
 PARSE:
         CD SKIPWS       ; CALL SKIPWS
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
         7E              ; MOV A,M
         B7              ; ORA A
         C8              ; RZ (empty line)
@@ -227,7 +241,7 @@ PARSE:
 ; CHKLBL - Check for and define label
 ; ============================================================
 CHKLBL:
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
         E5              ; PUSH H (save start)
 
 ; CL1 - Scan for colon
@@ -249,7 +263,7 @@ CL1:
 ; CL_NO - Not a label
 CLNO:
         E1              ; POP H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         C9              ; RET
 
 ; CL_YES - Found label, define it
@@ -257,36 +271,50 @@ CLYES:
         E1              ; POP H (start of label)
         CD DEFSYM       ; CALL DEFSYM
 ; Skip past colon
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
 
 CL2:
         7E              ; MOV A,M
         23              ; INX H
         FE 3A           ; CPI ':'
         C2 CL2          ; JNZ CL2
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         C9              ; RET
 
 ; ============================================================
 ; CHKDIR - Check for directive (ORG, END)
+; O/o can only be ORG (no hex starts with O)
+; E/e must check 2nd char: N/n = END, else hex (like E5)
 ; ============================================================
 CHKDIR:
         CD SKIPWS       ; CALL SKIPWS
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
         7E              ; MOV A,M
         B7              ; ORA A
         C8              ; RZ
 
-; Check for 'O' (ORG)
+; Check for 'O' (ORG) - no hex byte starts with O, so it's ORG
         FE 4F           ; CPI 'O'
         CA CDORG        ; JZ CD_ORG
         FE 6F           ; CPI 'o'
         CA CDORG        ; JZ CD_ORG
-; Check for 'E' (END)
+; Check for 'E' - could be END or hex like E5
         FE 45           ; CPI 'E'
-        CA CDEND        ; JZ CD_END
+        CA CKEND        ; JZ CK_END
         FE 65           ; CPI 'e'
+        CA CKEND        ; JZ CK_END
+        C9              ; RET
+
+; CK_END - Check if E is followed by N (END) or digit (hex)
+CKEND:
+        23              ; INX H
+        7E              ; MOV A,M
+        FE 4E           ; CPI 'N'
         CA CDEND        ; JZ CD_END
+        FE 6E           ; CPI 'n'
+        CA CDEND        ; JZ CD_END
+; Not END, restore LNPTR
+        2A FA 06        ; LHLD LNPTR
         C9              ; RET
 
 ; CD_ORG - Parse ORG
@@ -295,10 +323,10 @@ CDORG:
         23              ; INX H
         23              ; INX H
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         CD SKIPWS       ; CALL SKIPWS
         CD EXPR         ; CALL EXPR
-        22 88 05        ; SHLD LOCTR
+        22 F8 06        ; SHLD LOCTR
         C9              ; RET
 
 ; CD_END - END directive
@@ -306,43 +334,80 @@ CDEND:
 ; Set line to null AND update LNPTR so HEXLN sees empty
         21 80 06        ; LXI H,LINBUF (0680H)
         36 00           ; MVI M,0
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         C9              ; RET
 
 ; ============================================================
 ; HEXLN - Parse hex bytes with symbols
+; Token-based approach:
+;   2 hex chars = byte
+;   4 hex chars = word (little endian)
+;   otherwise = label reference
 ; ============================================================
 HEXLN:
         CD SKIPWS       ; CALL SKIPWS
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
         7E              ; MOV A,M
         B7              ; ORA A
-        C8              ; RZ (end)
+        C8              ; RZ (end of line)
         FE 3B           ; CPI ';'
         C8              ; RZ (comment)
 
-; Check for < (low byte)
+; Check for < (low byte prefix)
         FE 3C           ; CPI '<'
         CA HXLO         ; JZ HX_LO
-; Check for > (high byte)
+; Check for > (high byte prefix)
         FE 3E           ; CPI '>'
         CA HXHI         ; JZ HX_HI
-; Check for : (explicit symbol reference)
-        FE 3A           ; CPI ':'
-        CA HXCOL        ; JZ HX_COLON - skip : and parse symbol
 
-; Check if hex digit
-        CD ISHEX        ; CALL ISHEX
-        DA HXSYM        ; JC HX_SYM (not hex, try symbol)
+; Scan token: count length, check if all hex
+        E5              ; PUSH H (save token start)
+        06 00           ; MVI B,0 (length counter)
+        0E 00           ; MVI C,0 (all-hex flag: 0=yes)
 
-; Parse hex byte - first check second char is also hex
-        23              ; INX H (peek at second char)
+; SCAN - scan loop
+SCAN:
         7E              ; MOV A,M
-        CD ISHEXA       ; CALL ISHEX_A
-        2B              ; DCX H (back to first char)
-        DA HXSYM        ; JC HX_SYM - if second not hex, treat as symbol
-; Both chars are hex, parse as byte
-        7E              ; MOV A,M (reload first char)
+        B7              ; ORA A
+        CA SCAND        ; JZ SCAND (end of string)
+        FE 20           ; CPI ' '
+        CA SCAND        ; JZ SCAND
+        FE 09           ; CPI TAB
+        CA SCAND        ; JZ SCAND
+        FE 3B           ; CPI ';'
+        CA SCAND        ; JZ SCAND
+
+; Check if char is hex (preserve B,C)
+        C5              ; PUSH B
+        CD ISHEXA       ; CALL ISHEX_A (CY=1 if not hex)
+        C1              ; POP B
+        D2 SCANH        ; JNC SCANH (is hex)
+        0E 01           ; MVI C,1 (mark non-hex)
+; SCANH - char was hex, continue
+SCANH:
+        04              ; INR B
+        23              ; INX H
+        C3 SCAN         ; JMP SCAN
+
+; SCAND - scan done
+SCAND:
+        E1              ; POP H (restore token start)
+; C=0 means all hex, B=length
+        79              ; MOV A,C
+        B7              ; ORA A
+        C2 HXSYM        ; JNZ HXSYM (has non-hex = label)
+; All hex - check length
+        78              ; MOV A,B
+        FE 02           ; CPI 2
+        CA PARB         ; JZ PARB (2 chars = byte)
+        FE 04           ; CPI 4
+        CA PARW         ; JZ PARW (4 chars = word)
+; Not 2 or 4 = label
+        C3 HXSYM        ; JMP HXSYM
+
+; PARB - Parse 2 hex chars as byte
+PARB:
+        7E              ; MOV A,M
         CD HEXVAL       ; CALL HEXVAL
         07              ; RLC
         07              ; RLC
@@ -350,20 +415,55 @@ HEXLN:
         07              ; RLC
         47              ; MOV B,A
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
-        2A 8A 05        ; LHLD LNPTR
         7E              ; MOV A,M
         CD HEXVAL       ; CALL HEXVAL
         B0              ; ORA B
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
+        CD OUTPUT       ; CALL OUTPUT
+        C3 HEXLN        ; JMP HEXLN
+
+; PARW - Parse 4 hex chars as word (little endian)
+; CAFE -> output FE then CA
+; First 2 chars = high byte
+PARW:
+        7E              ; MOV A,M
+        CD HEXVAL       ; CALL HEXVAL
+        07              ; RLC
+        07              ; RLC
+        07              ; RLC
+        07              ; RLC
+        47              ; MOV B,A
+        23              ; INX H
+        7E              ; MOV A,M
+        CD HEXVAL       ; CALL HEXVAL
+        B0              ; ORA B
+        F5              ; PUSH PSW (save high byte)
+        23              ; INX H
+; Next 2 chars = low byte
+        7E              ; MOV A,M
+        CD HEXVAL       ; CALL HEXVAL
+        07              ; RLC
+        07              ; RLC
+        07              ; RLC
+        07              ; RLC
+        47              ; MOV B,A
+        23              ; INX H
+        7E              ; MOV A,M
+        CD HEXVAL       ; CALL HEXVAL
+        B0              ; ORA B
+        23              ; INX H
+        22 FA 06        ; SHLD LNPTR
+; Output low byte first
+        CD OUTPUT       ; CALL OUTPUT
+        F1              ; POP PSW
         CD OUTPUT       ; CALL OUTPUT
         C3 HEXLN        ; JMP HEXLN
 
 ; HX_LO - Low byte prefix (<SYMBOL)
 HXLO:
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         CD LOOKUP       ; CALL LOOKUP
         7D              ; MOV A,L
         CD OUTPUT       ; CALL OUTPUT
@@ -372,23 +472,15 @@ HXLO:
 ; HX_HI - High byte prefix (>SYMBOL)
 HXHI:
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         CD LOOKUP       ; CALL LOOKUP
         7C              ; MOV A,H
         CD OUTPUT       ; CALL OUTPUT
         C3 HEXLN        ; JMP HEXLN
 
-; HX_COLON - Explicit symbol reference (SYMBOL)
-; Skip the colon and fall through to HX_SYM
-HXCOL:
-        23              ; INX H (skip colon)
-        22 8A 05        ; SHLD LNPTR
-; Fall through to HX_SYM
-
-; HX_SYM - Symbol reference, output low then high
+; HX_SYM - Label reference, output low then high
 HXSYM:
         CD LOOKUP       ; CALL LOOKUP
-; HL = symbol value
         7D              ; MOV A,L
         CD OUTPUT       ; CALL OUTPUT
         7C              ; MOV A,H
@@ -403,7 +495,7 @@ HXSYM:
 GETCHR:
         C5              ; PUSH B
         E5              ; PUSH H
-        3A 81 05        ; LDA ICNT
+        3A F1 06        ; LDA ICNT
         B7              ; ORA A
         C2 GC1          ; JNZ GC1
 
@@ -417,19 +509,19 @@ GETCHR:
         B7              ; ORA A
         C2 GCEOF        ; JNZ GC_EOF
         3E 80           ; MVI A,128
-        32 81 05        ; STA ICNT
+        32 F1 06        ; STA ICNT
         21 00 07        ; LXI H,IBUF
-        22 82 05        ; SHLD IPTR
+        22 F2 06        ; SHLD IPTR
 
 GC1:
-        2A 82 05        ; LHLD IPTR
+        2A F2 06        ; LHLD IPTR
         7E              ; MOV A,M
         23              ; INX H
-        22 82 05        ; SHLD IPTR
+        22 F2 06        ; SHLD IPTR
         F5              ; PUSH PSW
-        3A 81 05        ; LDA ICNT
+        3A F1 06        ; LDA ICNT
         3D              ; DCR A
-        32 81 05        ; STA ICNT
+        32 F1 06        ; STA ICNT
         F1              ; POP PSW
         B7              ; ORA A
         CA GCEOF        ; JZ GC_EOF (null=EOF)
@@ -451,7 +543,7 @@ GCEOF:
 ; Returns: CY=1 if not hex
 ; ============================================================
 ISHEX:
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
         7E              ; MOV A,M
 ; Fall through to ISHEX_A
 
@@ -499,7 +591,7 @@ HV2:
 ; ============================================================
 OUTPUT:
         F5              ; PUSH PSW
-        3A 80 05        ; LDA PASS
+        3A F0 06        ; LDA PASS
         B7              ; ORA A
         CA OUTP1        ; JZ OUT_P1
         F1              ; POP PSW
@@ -507,14 +599,14 @@ OUTPUT:
 ; Pass 2 - output byte
         E5              ; PUSH H
         F5              ; PUSH PSW
-        2A 85 05        ; LHLD OPTR
+        2A F5 06        ; LHLD OPTR
         F1              ; POP PSW
         77              ; MOV M,A
         23              ; INX H
-        22 85 05        ; SHLD OPTR
-        3A 84 05        ; LDA OCNT
+        22 F5 06        ; SHLD OPTR
+        3A F4 06        ; LDA OCNT
         3C              ; INR A
-        32 84 05        ; STA OCNT
+        32 F4 06        ; STA OCNT
         FE 80           ; CPI 128
         CA OUTFUL       ; JZ OUT_FULL
         E1              ; POP H
@@ -524,9 +616,9 @@ OUTPUT:
 OUTFUL:
         CD WRSEC        ; CALL WRSEC
         21 80 07        ; LXI H,OBUF
-        22 85 05        ; SHLD OPTR
+        22 F5 06        ; SHLD OPTR
         AF              ; XRA A
-        32 84 05        ; STA OCNT
+        32 F4 06        ; STA OCNT
         E1              ; POP H
         C9              ; RET
 
@@ -534,9 +626,9 @@ OUTFUL:
 OUTP1:
         F1              ; POP PSW
         E5              ; PUSH H
-        2A 88 05        ; LHLD LOCTR
+        2A F8 06        ; LHLD LOCTR
         23              ; INX H
-        22 88 05        ; SHLD LOCTR
+        22 F8 06        ; SHLD LOCTR
         E1              ; POP H
         C9              ; RET
 
@@ -544,18 +636,18 @@ OUTP1:
 ; FLUSH - Flush output buffer
 ; ============================================================
 FLUSH:
-        3A 84 05        ; LDA OCNT
+        3A F4 06        ; LDA OCNT
         B7              ; ORA A
         C8              ; RZ
-        2A 85 05        ; LHLD OPTR
+        2A F5 06        ; LHLD OPTR
 FL1:
-        3A 84 05        ; LDA OCNT
+        3A F4 06        ; LDA OCNT
         FE 80           ; CPI 128
         D2 WRSEC        ; JNC WRSEC
         36 00           ; MVI M,0
         23              ; INX H
         3C              ; INR A
-        32 84 05        ; STA OCNT
+        32 F4 06        ; STA OCNT
         C3 FL1          ; JMP FL1
 
 ; WRSEC - Write sector
@@ -609,7 +701,7 @@ MUDF:
 DEFSYM:
 ; Symbol table at 0840, 8 bytes per entry (6 name + 2 value)
         E5              ; PUSH H (label start)
-        3A 87 05        ; LDA SYMCNT
+        3A F7 06        ; LDA SYMCNT
 ; Calculate slot: SYMTAB + SYMCNT * 8 (16-bit to handle >32 symbols)
         6F              ; MOV L,A
         26 00           ; MVI H,0
@@ -656,7 +748,7 @@ DS2A:
 
 ; DS3 - Store value (LOCTR)
 DS3:
-        2A 88 05        ; LHLD LOCTR
+        2A F8 06        ; LHLD LOCTR
         7D              ; MOV A,L
         12              ; STAX D
         13              ; INX D
@@ -664,9 +756,9 @@ DS3:
         12              ; STAX D
 
 ; Increment symbol count
-        3A 87 05        ; LDA SYMCNT
+        3A F7 06        ; LDA SYMCNT
         3C              ; INR A
-        32 87 05        ; STA SYMCNT
+        32 F7 06        ; STA SYMCNT
         C9              ; RET
 
 ; ============================================================
@@ -675,8 +767,8 @@ DS3:
 ; ============================================================
 LOOKUP:
 ; Read symbol from line into temp, then search
-        2A 8A 05        ; LHLD LNPTR
-        11 00 06        ; LXI D,TOKBUF
+        2A FA 06        ; LHLD LNPTR
+        11 20 06        ; LXI D,TOKBUF (0620)
         06 06           ; MVI B,6
 
 ; LK0 - Copy symbol to TOKBUF
@@ -733,14 +825,15 @@ LK0E:
         13              ; INX D
         05              ; DCR B
         C2 LK0E         ; JNZ LK0E
+        C3 LK0E         ; JMP LK0E (re-check B at top)
 
 ; LK1 - Save updated line pointer
 LK1:
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
 
 ; Search symbol table
         21 40 08        ; LXI H,SYMTAB
-        3A 87 05        ; LDA SYMCNT
+        3A F7 06        ; LDA SYMCNT
         B7              ; ORA A
         CA LKNF         ; JZ LK_NF (not found)
         47              ; MOV B,A
@@ -748,7 +841,7 @@ LK1:
 ; LK2 - Compare entry with TOKBUF
 LK2:
         E5              ; PUSH H
-        11 00 06        ; LXI D,TOKBUF
+        11 20 06        ; LXI D,TOKBUF (0620)
         0E 06           ; MVI C,6
 ; LK3
 LK3:
@@ -781,7 +874,7 @@ LK4:
 LKNF:
 ; In pass 1, return 0
 ; In pass 2, error
-        3A 80 05        ; LDA PASS
+        3A F0 06        ; LDA PASS
         B7              ; ORA A
         CA LKNF0        ; JZ LK_NF0
 ; Pass 2 - error
@@ -798,7 +891,7 @@ LKNF0:
 ; ============================================================
 EXPR:
         CD SKIPWS       ; CALL SKIPWS
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
         7E              ; MOV A,M
 
 ; Check for $ prefix (hex)
@@ -816,7 +909,7 @@ EXPR:
 
 ; EX_NUM - Accumulate digits
 EXNUM:
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
 ; Use DE for accumulator
         E5              ; PUSH H
         21 00 00        ; LXI H,0
@@ -851,7 +944,7 @@ EXN1A:
 ; EX_DIG - Is hex digit
 EXDIG:
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
 ; Shift DE left 4, add digit
         E5              ; PUSH H
         62              ; MOV H,D
@@ -863,8 +956,9 @@ EXDIG:
         EB              ; XCHG
         E1              ; POP H
 ; Add digit value
-        2B              ; DCX H
-        7E              ; MOV A,M
+        7E              ; MOV A,M (note: we advanced, so wrong char)
+        2B              ; DCX H (go back)
+        7E              ; MOV A,M (get correct char)
         23              ; INX H
         FE 41           ; CPI 'A'
         DA EXD09        ; JC EX_D09
@@ -887,7 +981,7 @@ EXDONE:
 ; EX_NH - 'H' found, skip it and return
 EXNH:
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         EB              ; XCHG
         C9              ; RET
 
@@ -899,10 +993,10 @@ EXSYM:
 ; EX_HEX - $XX hex format
 EXHEX:
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         21 00 00        ; LXI H,0
         EB              ; XCHG
-        2A 8A 05        ; LHLD LNPTR
+        2A FA 06        ; LHLD LNPTR
 
 ; EXH1
 EXH1:
@@ -925,7 +1019,7 @@ EXH1A:
 ; EXH_DG
 EXHDG:
         23              ; INX H
-        22 8A 05        ; SHLD LNPTR
+        22 FA 06        ; SHLD LNPTR
         E5              ; PUSH H
         62              ; MOV H,D
         6B              ; MOV L,E
