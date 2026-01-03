@@ -15,7 +15,8 @@ SPAZM0.COM (430 bytes) - hex-to-COM converter working correctly.
 ### Completed
 - **Phase 1**: Lode and design documentation ✓
 - **Phase 2**: MCP server added to heh8080 ✓
-  - `Heh8080.Mcp` project with 9 tools (SendInput, ReadScreen, WaitForText, etc.)
+  - `Heh8080.Mcp` project with 20 tools (console, memory, disk, debug)
+  - Debug tools: trace logging, breakpoints, single-step, register access
   - Tested and verified working with LOLOS
 - **Workflow**: cpmtools-based source file sync established ✓
 - **LOLOS boot verified**: work.dsk boots, MCP console interaction works ✓
@@ -25,6 +26,7 @@ SPAZM0.COM (430 bytes) - hex-to-COM converter working correctly.
   - Multi-line support verified working
 - **Stage 1 source**: Written in `src/stage1.hex` (~870 lines)
   - Two-pass assembler with labels, ORG, END, EQU
+  - Addresses corrected with `fixaddr.py` (89 labels, 139 branches verified)
   - Ready to assemble with SPAZM0
 
 ### Next Steps
@@ -72,6 +74,9 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 - `SendInput`, `ReadScreen`, `WaitForText` - console interaction
 - `PeekMemory`, `PokeMemory` - memory access
 - `Status`, `Reset`, `MountDisk`, `DiskInfo` - machine control
+- `GetCpuState`, `Step`, `StopMachine`, `Continue` - execution control
+- `EnableTrace`, `DisableTrace`, `GetTrace`, `ClearTrace` - instruction tracing
+- `SetBreakpoint`, `ClearBreakpoint`, `ListBreakpoints` - breakpoints
 
 ### Sync Workflow
 ```bash
@@ -84,9 +89,11 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 |------|---------|
 | `lode/assembler/architecture.md` | Two-pass design, data structures, module APIs |
 | `lode/assembler/bootstrap.md` | Stage 0-3 bootstrap strategy |
-| `lode/assembler/workflow.md` | cpmtools sync workflow |
+| `lode/assembler/workflow.md` | cpmtools sync workflow, fixaddr.py docs |
 | `lode/terminology.md` | 8080/Z80/CP/M vocabulary |
 | `lode/practices.md` | Assembly coding patterns |
+| `scripts/fixaddr.py` | Address correction for hand-assembled hex |
 | `src/stage0.asm` | Stage 0 documented source |
 | `src/stage0.hex` | Stage 0 hand-assembled bytes |
 | `src/stage0.com` | Stage 0 binary (430 bytes) |
+| `src/stage1.hex` | Stage 1 hand-assembled source (1155 bytes) |

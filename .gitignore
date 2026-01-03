@@ -10,6 +10,8 @@ work.dsk
 *.com
 *.lst
 
+!src/stage1.hex
+
 # Editor backups
 *~
 *.bak
