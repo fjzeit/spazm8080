@@ -14,9 +14,14 @@ SPAZM0.COM (432 bytes) - hex-to-COM converter working correctly.
 
 ### Stage 1 Complete ✓
 
-STAGE1.COM (1158 bytes) - two-pass assembler with labels, ORG, END.
+STAGE1.COM (1172 bytes) - two-pass assembler with labels, ORG, END, `<`/`>` operators.
 
-**Bug fixed (2026-01-03)**: GETCHR was not preserving HL register, which RDLINE uses to track position in LINBUF. After each GETCHR call, HL pointed into IBUF instead of LINBUF, causing characters to be stored in the wrong buffer. Fixed by adding `PUSH H`/`POP H` in GETCHR.
+**Bugs fixed (2026-01-03)**:
+1. GETCHR not preserving HL - RDLINE stored chars in wrong buffer. Fixed with PUSH H/POP H.
+2. OUTPUT not preserving HL in Pass 2 - Symbol values corrupted. Fixed with PUSH H/POP H.
+3. HX_LO/HX_HI outputting both bytes - `<SYM` output 2 bytes. Fixed to call LOOKUP directly.
+
+See [assembler/stage1-testing.md](assembler/stage1-testing.md) for full test results.
 
 ### Completed
 - **Phase 1**: Lode and design documentation ✓
@@ -103,4 +108,4 @@ Configured in `.claude/settings.json` - available as `cpm` MCP server with tools
 | `src/stage0.asm` | Stage 0 documented source |
 | `src/stage0.8hex` | Stage 0 hand-assembled bytes |
 | `src/stage0.com` | Stage 0 binary (430 bytes) |
-| `src/stage1.8hex` | Stage 1 hand-assembled source (1158 bytes) |
+| `src/stage1.8hex` | Stage 1 hand-assembled source (1172 bytes) |
