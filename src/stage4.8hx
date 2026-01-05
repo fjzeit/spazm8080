@@ -323,11 +323,11 @@ CHKDIR:
         B7              ; ORA A
         C8              ; RZ
 
-; Check for 'O' (ORG) - no hex byte starts with O, so it's ORG
+; Check for 'O' (ORG/ORA/ORI/OUT) - no hex starts with O
         FE 4F           ; CPI 'O'
-        CA CDORG        ; JZ CD_ORG
+        CA CKORG        ; JZ CK_ORG (verify it's ORG not ORA/ORI/OUT)
         FE 6F           ; CPI 'o'
-        CA CDORG        ; JZ CD_ORG
+        CA CKORG        ; JZ CK_ORG
 ; Check for 'E' - could be END or hex like E5
         FE 45           ; CPI 'E'
         CA CKEND        ; JZ CK_END
@@ -351,6 +351,34 @@ CKEND:
 ; Not END, restore LNPTR
         2A DA 10        ; LHLD LNPTR
         C9              ; RET
+
+; ============================================================
+; CK_ORG - Check if O is followed by RG (ORG) vs RA/RI/UT
+; ============================================================
+CKORG:
+        23              ; INX H (now at 2nd char)
+        7E              ; MOV A,M
+        FE 52           ; CPI 'R'
+        CA CKOR2        ; JZ check 3rd char
+        FE 72           ; CPI 'r'
+        CA CKOR2        ; JZ check 3rd char
+; Not 'R', so not ORG (could be OUT)
+        2A DA 10        ; LHLD LNPTR
+        C9              ; RET
+CKOR2:
+        23              ; INX H (now at 3rd char)
+        7E              ; MOV A,M
+        FE 47           ; CPI 'G'
+        CA CKOR3        ; JZ is ORG
+        FE 67           ; CPI 'g'
+        CA CKOR3        ; JZ is ORG
+; Not 'G', so not ORG (could be ORA/ORI)
+        2A DA 10        ; LHLD LNPTR
+        C9              ; RET
+CKOR3:
+; It's ORG - restore LNPTR and jump to CDORG
+        2A DA 10        ; LHLD LNPTR
+        C3 CDORG        ; JMP CDORG
 
 ; CD_ORG - Parse ORG directive
 CDORG:
@@ -1080,6 +1108,10 @@ EXPR:
         FE 24           ; CPI '$'
         CA EXHEX        ; JZ EX_HEX
 
+; Check for ' prefix (character literal)
+        FE 27           ; CPI '\''
+        CA EXCHR        ; JZ EX_CHR
+
 ; Check for digit
         FE 30           ; CPI '0'
         DA LOOKUP       ; JC LOOKUP (not digit = symbol)
@@ -1162,6 +1194,23 @@ EXNH:
         23              ; INX H
         22 DA 10        ; SHLD LNPTR
         EB              ; XCHG
+        C9              ; RET
+
+; EX_CHR - 'x' character literal format
+; Returns character value in HL
+EXCHR:
+        23              ; INX H (skip opening quote)
+        7E              ; MOV A,M (get character)
+        47              ; MOV B,A (save char in B)
+        23              ; INX H (advance past char)
+        7E              ; MOV A,M (check closing quote)
+        FE 27           ; CPI '\''
+        C2 EXCR1        ; JNZ EXCR1 (no closing quote)
+        23              ; INX H (skip closing quote)
+EXCR1:
+        22 DA 10        ; SHLD LNPTR
+        68              ; MOV L,B (char value to L)
+        26 00           ; MVI H,0
         C9              ; RET
 
 ; EX_HEX - $XX hex format
@@ -1779,6 +1828,16 @@ GREGN:
         C3 GREGLP       ; JMP loop
 
 ; ============================================================
+; Shared return routines (must be before GETRP/GTRPSH for forward refs)
+; ============================================================
+RET0:   AF              ; XRA A
+        C9              ; RET
+RET1:   3E 01           ; MVI A,1
+        C9              ; RET
+RET2:   3E 02           ; MVI A,2
+        C9              ; RET
+
+; ============================================================
 ; GETRP - Get register pair code from source
 ; Returns: A = pair code (0=B, 1=D, 2=H, 3=SP)
 ; ============================================================
@@ -1844,18 +1903,8 @@ GTRPSH:
         C2 RET0         ; JNZ unknown
         23              ; INX H
         22 DA 10        ; SHLD LNPTR
-; Return 3 for PSW (falls through to shared return)
+; Return 3 for PSW
         3E 03           ; MVI A,3
-        C9              ; RET
-; Shared return routines
-RET0:
-        AF              ; XRA A
-        C9              ; RET
-RET1:
-        3E 01           ; MVI A,1
-        C9              ; RET
-RET2:
-        3E 02           ; MVI A,2
         C9              ; RET
 
         END

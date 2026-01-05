@@ -2,6 +2,45 @@
 
 Source files are version-controlled as text in `src/`, synced to/from the CP/M disk image for development.
 
+## CP/M Emulator Setup
+
+The MCP-connected CP/M emulator (heh8080) has important conventions:
+
+### Drive Configuration
+
+| Drive | Purpose | Notes |
+|-------|---------|-------|
+| A: | LOLOS system disk | **DO NOT REPLACE** - boots latest LOLOS by default |
+| B: | Development work disk | Mount `work.dsk` here for all development |
+
+**Critical**: The emulator boots LOLOS from its built-in system disk on A:. Never mount work.dsk on A: as it will break the boot process.
+
+### Mounting the Work Disk
+
+```python
+# At session start - mount work disk on B:
+mcp__cpm__MountDisk(drive=1, path="/path/to/work.dsk")
+```
+
+### Refreshing After External Changes
+
+**The emulator caches disk content.** After using cpmtools (cpmcp, cpmrm) to modify work.dsk, the emulator still sees OLD cached data.
+
+**Always call RefreshDisk after cpmtools modifications:**
+
+```python
+# After sync-to-disk.sh or any cpmcp/cpmrm commands:
+mcp__cpm__RefreshDisk(drive=1)  # Refresh B: drive
+```
+
+**Symptoms of stale cache:**
+- "No file" errors when file definitely exists
+- DIR shows old/missing files
+- Assembler produces wrong output
+- Changes don't appear after sync
+
+**RefreshDisk is preferred over Reset** - it reopens the file handle instantly without losing emulator state or rebooting.
+
 ## Critical Tool: fixaddr.py
 
 **When modifying hand-assembled `.8hx` files, ALWAYS use `fixaddr.py` after making changes.**
@@ -43,10 +82,15 @@ To restore work.dsk if corrupted: `cp ../lolos/drivea.dsk work.dsk`
 
 ### During Session (via MCP)
 
-```
-SendInput("ASM SPAZM\r")    # Assemble
-ReadScreen()                 # Check output
-SendInput("SPAZM TEST\r")   # Test
+```python
+# Mount work disk and refresh after sync
+mcp__cpm__MountDisk(drive=1, path="work.dsk")
+mcp__cpm__RefreshDisk(drive=1)
+
+# Work on B: drive
+SendInput("B:\r")              # Switch to B:
+SendInput("STAGE4 TEST\r")     # Assemble
+ReadScreen()                   # Check output
 ```
 
 ### After Session
@@ -108,33 +152,6 @@ python3 scripts/fixaddr.py src/stage1.hex --show-labels
 
 The tool is idempotent - running it twice produces no additional changes.
 
-## Disk Refresh After External Changes
-
-**The CP/M emulator keeps disk file handles open.** When external tools (cpmcp, cpmrm) modify the disk image file, the running emulator still sees the OLD cached content.
-
-**Use RefreshDisk after cpmtools modifications:**
-
-```bash
-# Modify disk externally
-./scripts/sync-to-disk.sh
-
-# Refresh emulator's view of the disk (no reboot needed!)
-mcp__cpm__RefreshDisk(0)   # Refresh drive A:
-```
-
-Or use Reset if you prefer a clean slate:
-```bash
-mcp__cpm__Reset()   # Full reboot - slower but guaranteed clean
-```
-
-Symptoms of stale cache:
-- "No file" errors when file definitely exists
-- Assembler produces wrong/old output
-- Changes don't appear in DIR listing
-- Assembled binaries contain old code
-
-**RefreshDisk is preferred** - it reopens the file handle without losing emulator state.
-
 ## Hex-Format Source Rules
 
 ### CRITICAL: Label Names Must Contain Non-Hex Characters
@@ -195,7 +212,7 @@ In the bootstrap stages (0-3), **all numeric literals are interpreted as hexadec
 ## Safety
 
 - **Always sync-from-disk** before ending a session
-- **Always reset machine** after sync-to-disk
-- Disk image can be restored from lolos repo if corrupted
+- **Always RefreshDisk** after sync-to-disk (not reset - preserves emulator state)
+- Work disk can be recreated: `mkfs.cpm -f ibm-3740 work.dsk`
 - Text sources in git provide full history and recovery
 - Consider periodic `git stash` during long sessions

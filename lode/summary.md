@@ -4,7 +4,7 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Bootstrap Stage 3 - ALL DATA DIRECTIVES COMPLETE
+**Phase**: Bootstrap Stage 4 COMPLETE - Full mnemonic parsing
 
 ### Cold Boot Pipeline (PROTECTED)
 
@@ -13,7 +13,8 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 | `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes | FROZEN |
 | `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | Complete |
 | `src/stage2.8hx` | Stage 1 | STAGE1 | STAGE2.COM | 1408 bytes | FROZEN |
-| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1800 bytes | EQU+DEFB/W/S done |
+| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1800 bytes | FROZEN |
+| `src/stage4.8hx` | Stage 3 | STAGE3 | STAGE4.COM | 2816 bytes | **Complete** |
 
 All stages now read `.8HX` extension (cold bootstrap updated).
 
@@ -22,31 +23,38 @@ All stages now read `.8HX` extension (cold bootstrap updated).
 ### Implemented Features
 
 - **Two-pass assembly**: Forward references resolved via symbol table
-- **Labels**: `LABEL:` defines symbol at current address
-- **Directives**: ORG, END, EQU, DEFB (Stage 3)
+- **Labels**: `LABEL:` defines symbol at current address (max 6 chars)
+- **Directives**: ORG, END, EQU, DEFB, DEFW, DEFS
 - **Symbol references**: `C3 LABEL` emits address bytes
 - **Low/high byte operators**: `<LABEL`, `>LABEL`
 - **Token-length parsing**: 2 chars=byte, 4 chars=word, else=label
-- **Self-hosting**: Stage 2 assembles itself identically
+- **Self-hosting**: All stages assemble themselves identically (circular bootstrap)
 - **EQU directive**: `NAME EQU value` defines constant (no colon, value-based)
 - **DEFB directive**: `DEFB expr, expr, 'string'` emits bytes and strings
 - **DEFW directive**: `DEFW expr, expr` emits 16-bit words (little-endian)
 - **DEFS directive**: `DEFS count` reserves bytes (outputs zeros)
+- **Full 8080 mnemonics** (Stage 4): All instruction types supported
+
+### Stage 4 Mnemonic Support
+
+| Format | Instructions |
+|--------|--------------|
+| No operand | NOP, HLT, RET, Rcc, XCHG, STC, CMC, CMA, DAA, EI, DI, SPHL, PCHL, XTHL, rotates |
+| Register | INR, DCR, ADD, ADC, SUB, SBB, ANA, XRA, ORA, CMP, MOV |
+| Immediate | MVI, ADI, ACI, SUI, SBI, ANI, XRI, ORI, CPI, IN, OUT |
+| Reg pair | INX, DCX, DAD, LXI, PUSH, POP, LDAX, STAX |
+| Address | JMP, Jcc, CALL, Ccc, LDA, STA, LHLD, SHLD |
 
 ### Not Yet Implemented
 
 - Expression arithmetic (+, -)
+- RST instruction (needs special format)
 
 ### Next Steps
 
-All data directives complete:
-1. ~~Create stage3.8hx (copy of stage2.8hx)~~ ✓
-2. ~~Add EQU directive (simplest, no output)~~ ✓
-3. ~~Add DEFB directive (strings and bytes)~~ ✓
-4. ~~Add DEFW directive (16-bit words)~~ ✓
-5. ~~Add DEFS directive (reserve space)~~ ✓
+**Stage 5**: Rewrite stage4.8hx using proper mnemonics instead of hex bytes.
 
-Next: Expression arithmetic (+, -) or begin Stage 4 (mnemonic parsing)
+See `lode/tmp/handover-stage5.md` for detailed handover.
 
 ### Critical Rule: Hex Label Names
 
@@ -56,7 +64,7 @@ The token parser treats 4-char all-hex strings as word literals. A label like `C
 
 ### Resume Prompt
 
-"Continue spazm8080 development. Stage 3 has all data directives (EQU, DEFB, DEFW, DEFS). Next: expression arithmetic or Stage 4 mnemonic parsing."
+"Continue spazm8080 development. Stage 4 is complete with full 8080 mnemonic support. Next: Stage 5 - rewrite stage4.8hx using mnemonics instead of hex bytes. See lode/tmp/handover-stage5.md for details."
 
 ## Goals
 
@@ -119,4 +127,6 @@ Configured in `.mcp.json` - available as `cpm` MCP server with tools:
 | `src/stage0.8hx` | Stage 0 source - FROZEN |
 | `src/stage1.8hx` | Stage 1 source (1296 bytes) - raw hex format |
 | `src/stage2.8hx` | Stage 2 source (1408 bytes) - self-hosting, FROZEN |
-| `src/stage3.8hx` | Stage 3 source - adds EQU, memory layout expanded |
+| `src/stage3.8hx` | Stage 3 source - adds DEFB/DEFW, FROZEN |
+| `src/stage4.8hx` | Stage 4 source (2816 bytes) - full mnemonic support |
+| `lode/tmp/handover-stage5.md` | Stage 5 handover document |
