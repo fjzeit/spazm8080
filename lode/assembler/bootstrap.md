@@ -2,14 +2,20 @@
 
 spazm8080 bootstraps from zero - no external assembler required.
 
+**STATUS: BOOTSTRAP COMPLETE** - Circular self-hosting achieved.
+
 ## Cold Boot Pipeline (PROTECTED)
 
 | File | Format | Assembler | Output | Size | Status |
 |------|--------|-----------|--------|------|--------|
 | `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes | FROZEN |
-| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | Complete |
+| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | FROZEN |
 | `src/stage2.8hx` | Stage 1 | STAGE1 | STAGE2.COM | 1408 bytes | FROZEN |
-| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1620 bytes | Pending |
+| `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1800 bytes | FROZEN |
+| `src/stage4.8hx` | Stage 3 | STAGE3 | STAGE4.COM | ~3000 bytes | FROZEN |
+| `src/stage5.asm` | Stage 4 | STAGE4 | STAGE5.COM | ~3000 bytes | **COMPLETE** |
+
+**Verified**: STAGE5.COM assembles STAGE5.ASM → produces identical binary (circular bootstrap).
 
 ### What's FROZEN vs Editable
 
@@ -59,7 +65,7 @@ COLD BOOT (frozen, raw hex):
 │  Stage 0: src/stage0.8hx → SPAZM0.COM                      │
 │  Format: Raw hex bytes only                                  │
 │  Capabilities: Hex pairs + semicolon comments               │
-│  Status: COMPLETE (432 bytes)                               │
+│  Status: FROZEN (432 bytes)                                 │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
@@ -67,34 +73,48 @@ COLD BOOT (frozen, raw hex):
 │  Stage 1: src/stage1.8hx → STAGE1.COM                      │
 │  Format: Raw hex bytes only (Stage 0 input)                 │
 │  Capabilities: Labels, ORG, END, symbol refs, </>           │
-│  Status: COMPLETE (1296 bytes)                              │
+│  Status: FROZEN (1296 bytes)                                │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
-FORWARD DEVELOPMENT (uses Stage 1 format):
 ┌─────────────────────────────────────────────────────────────┐
 │  Stage 2: src/stage2.8hx → STAGE2.COM                      │
 │  Format: Stage 1 syntax (labels, symbols)                   │
 │  Capabilities: Same as Stage 1 (labels, ORG, END, </>)      │
-│  Status: COMPLETE + SELF-HOSTING (1408 bytes) [FROZEN]      │
+│  Status: FROZEN (1408 bytes)                                │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Stage 3: src/stage3.8hx → STAGE3.COM                      │
 │  Format: Stage 2 syntax (same as Stage 1)                   │
-│  New: DB, DW, DS, EQU directives                            │
-│  Status: NOT STARTED                                        │
+│  New: DEFB, DEFW, DEFS, EQU directives                      │
+│  Status: FROZEN (~1800 bytes)                               │
 └─────────────────────────────────────────────────────────────┘
                               │ assembles
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Stage 4+: Full spazm8080                                   │
-│  Format: Stage 3 syntax (uses DB, DW, DS, EQU)              │
-│  New: Full 8080 mnemonics, macros, conditionals             │
-│  Goal: Assemble lolos source                                │
-│  Status: NOT STARTED                                        │
+│  Stage 4: src/stage4.8hx → STAGE4.COM                      │
+│  Format: Stage 3 syntax (uses DEFB, DEFW, EQU)              │
+│  New: Full 8080 mnemonics (all instruction types)           │
+│  Status: FROZEN (~3000 bytes)                               │
 └─────────────────────────────────────────────────────────────┘
+                              │ assembles
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 5: src/stage5.asm → STAGE5.COM                      │
+│  Format: Standard 8080 mnemonics                            │
+│  New: Human-readable source (no hex opcodes)                │
+│  Status: COMPLETE + SELF-HOSTING (~3000 bytes)              │
+└─────────────────────────────────────────────────────────────┘
+                              │ assembles
+                              ▼
+                         ┌─────────┐
+                         │ STAGE5  │◀──┐
+                         └────┬────┘   │
+                              │        │
+                              └────────┘
+                         (circular bootstrap)
 ```
 
 ## Format Comparison
@@ -191,26 +211,37 @@ Two-pass assembler with labels. Reads `.8HX`, writes `.COM`.
 - Expression arithmetic (+, -)
 - Character literals in hex context ('A')
 
-## Stage 2 Status
+## Stage Summary
 
-Stage 1 functionality ported to Stage 1 format:
+### Stage 2
+Stage 1 functionality ported to Stage 1 format. Self-hosting baseline. **FROZEN**.
 
-1. **Verify bootstrap**: Write `stage2.hex` using Stage 1 syntax ✓
-2. **Match output**: `STAGE1 STAGE2` works ✓
-3. **Self-host**: Stage 2 assembles itself ✓
+### Stage 3
+Added DEFB, DEFW, DEFS, EQU directives. **FROZEN**.
 
-**Stage 2 is now FROZEN** - it serves as the stable self-hosting baseline.
+### Stage 4
+Full 8080 mnemonic parsing. All instruction types supported. **FROZEN**.
 
-## Stage 3 Plan
+### Stage 5
+Stage 4 rewritten in standard 8080 mnemonics (no hex opcodes). ~1888 lines.
+**COMPLETE + SELF-HOSTING**.
 
-See [../plans/directive-impl.md](../plans/directive-impl.md) for full details.
+## Forward Reference Bug (Historical)
 
-1. Create stage3.8hx (copy of stage2.8hx)
-2. Add EQU: `LABEL EQU expr`
-3. Add DB: `DB expr, expr, 'string'`
-4. Add DW: `DW expr, expr` (little-endian)
-5. Add DS: `DS expr` (reserve bytes)
-6. Self-host: Stage 3 assembles itself using new features
+During Stage 5 development, a critical bug was discovered: STAGE3 couldn't handle forward references to labels defined at the end of the file. This caused the RET0/RET1/RET2 routines (referenced by GETRP/GTRPSH) to be missing from the binary.
+
+**Fix**: Moved RET0/RET1/RET2 definitions before the routines that reference them. Applied to both stage4.8hx and stage5.asm.
+
+**Lesson**: STAGE3's two-pass assembly doesn't fully resolve forward references for labels defined after all their uses. Order matters.
+
+## Future Extension (for lolos)
+
+To assemble lolos source code (CCP, BDOS, BIOS), STAGE5 would need:
+- Expression arithmetic in EQU and operands (`+`, `-`, `*`, `/`)
+- DS directive (reserve storage without initial values)
+- DB/DW aliases for DEFB/DEFW
+- String literals in DEFB (`DEFB 'Hello'`)
+- ORG with label expressions (`ORG BIOS`)
 
 ## Key Invariants
 

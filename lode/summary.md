@@ -4,21 +4,22 @@ spazm8080 is a self-hosted 8080/Z80 macro assembler written in Intel 8080 assemb
 
 ## Current Status
 
-**Phase**: Bootstrap Stage 4 COMPLETE - Full mnemonic parsing
+**Phase**: Bootstrap Stage 5 COMPLETE - Circular self-hosting achieved
 
 ### Cold Boot Pipeline (PROTECTED)
 
 | File | Format | Assembler | Output | Size | Status |
 |------|--------|-----------|--------|------|--------|
 | `src/stage0.8hx` | Raw hex | Hand/xxd | SPAZM0.COM | 432 bytes | FROZEN |
-| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | Complete |
+| `src/stage1.8hx` | Raw hex | SPAZM0 | STAGE1.COM | 1296 bytes | FROZEN |
 | `src/stage2.8hx` | Stage 1 | STAGE1 | STAGE2.COM | 1408 bytes | FROZEN |
 | `src/stage3.8hx` | Stage 2 | STAGE2 | STAGE3.COM | ~1800 bytes | FROZEN |
-| `src/stage4.8hx` | Stage 3 | STAGE3 | STAGE4.COM | 2816 bytes | **Complete** |
+| `src/stage4.8hx` | Stage 3 | STAGE3 | STAGE4.COM | ~3000 bytes | FROZEN |
+| `src/stage5.asm` | Stage 4 | STAGE4 | STAGE5.COM | ~3000 bytes | **COMPLETE** |
 
-All stages now read `.8HX` extension (cold bootstrap updated).
+**Circular Bootstrap Verified**: STAGE5.COM assembles STAGE5.ASM and produces an identical binary.
 
-*stage1.8hx can be modified but **must remain in Stage 0 format** (raw hex bytes). Use `fixaddr.py` after edits.
+All stages read `.8HX` extension except Stage 5 which uses `.ASM` (standard 8080 mnemonics).
 
 ### Implemented Features
 
@@ -45,16 +46,20 @@ All stages now read `.8HX` extension (cold bootstrap updated).
 | Reg pair | INX, DCX, DAD, LXI, PUSH, POP, LDAX, STAX |
 | Address | JMP, Jcc, CALL, Ccc, LDA, STA, LHLD, SHLD |
 
-### Not Yet Implemented
+### Not Yet Implemented (for lolos compatibility)
 
-- Expression arithmetic (+, -)
+- Expression arithmetic in EQU and operands (`+`, `-`, `*`, `/`)
+- DS directive (reserve storage without values)
+- DB/DW directive aliases (currently DEFB/DEFW)
+- String literals in DEFB (`DEFB 'Hello'`)
+- ORG with label expressions (`ORG BIOS`)
 - RST instruction (needs special format)
 
-### Next Steps
+### Bootstrap Complete
 
-**Stage 5**: Rewrite stage4.8hx using proper mnemonics instead of hex bytes.
+The primary bootstrap goal has been achieved. STAGE5.COM is a fully self-hosting 8080 assembler written in standard 8080 mnemonics.
 
-See `lode/tmp/handover-stage5.md` for detailed handover.
+**Verified**: Two consecutive self-assemblies produce byte-identical binaries.
 
 ### Critical Rule: Hex Label Names
 
@@ -64,7 +69,7 @@ The token parser treats 4-char all-hex strings as word literals. A label like `C
 
 ### Resume Prompt
 
-"Continue spazm8080 development. Stage 4 is complete with full 8080 mnemonic support. Next: Stage 5 - rewrite stage4.8hx using mnemonics instead of hex bytes. See lode/tmp/handover-stage5.md for details."
+"Continue spazm8080 development. Bootstrap complete - STAGE5.COM is a self-hosting 8080 assembler in standard mnemonics. Next goal: extend to assemble lolos (CCP/BDOS/BIOS) - requires expression arithmetic, DS directive, string literals, and DB/DW aliases."
 
 ## Goals
 
@@ -125,8 +130,8 @@ Configured in `.mcp.json` - available as `cpm` MCP server with tools:
 | `lode/practices.md` | Assembly coding patterns |
 | `scripts/fixaddr.py` | **Critical**: Address correction after .8hx edits |
 | `src/stage0.8hx` | Stage 0 source - FROZEN |
-| `src/stage1.8hx` | Stage 1 source (1296 bytes) - raw hex format |
-| `src/stage2.8hx` | Stage 2 source (1408 bytes) - self-hosting, FROZEN |
-| `src/stage3.8hx` | Stage 3 source - adds DEFB/DEFW, FROZEN |
-| `src/stage4.8hx` | Stage 4 source (2816 bytes) - full mnemonic support |
-| `lode/tmp/handover-stage5.md` | Stage 5 handover document |
+| `src/stage1.8hx` | Stage 1 source (1296 bytes) - FROZEN |
+| `src/stage2.8hx` | Stage 2 source (1408 bytes) - FROZEN |
+| `src/stage3.8hx` | Stage 3 source - adds DEFB/DEFW - FROZEN |
+| `src/stage4.8hx` | Stage 4 source - full mnemonic support - FROZEN |
+| `src/stage5.asm` | Stage 5 source (~1888 lines) - **self-hosting assembler** |
